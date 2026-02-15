@@ -1,8 +1,10 @@
 # spring-2026-LLM-hallucinations
+
 Team project: spring-2026-LLM-hallucinations
 
-# Folder Structure 
+## Folder Structure
 
+```text
 spectral-llm_hallucinations-project/
 │
 ├── data/                        # Data (e.g. loaded from Hugging Face)
@@ -14,32 +16,32 @@ spectral-llm_hallucinations-project/
 │   ├── __init__.py
 │   ├── config.py                # Configuration (macros, paths, constants)
 │   │
-│   ├── data/                    
+│   ├── data/
 │   │   ├── __init__.py
 │   │   ├── loaders.py           # Dataset loaders
 │   │   └── cleaning.py          # Data cleaning
 │   │
-│   ├── analysis/                
+│   ├── analysis/
 │   │   ├── __init__.py
 │   │   ├── stats.py             # Statistics routines (pre and post-processing)
 │   │   └── eda.py               # EDA
 │   │
 │   ├── data_generation.py       # model serving => LLM and LLM-as-judge
 │   │
-│   ├── spectral_comp/                
+│   ├── spectral_comp/
 │   │   ├── __init__.py
 │   │   ├── lapEval.py           # Calculation of Top Laplacian eigenvalues
-│   │   └── noelEval.py          # Calculation of Noel's Spectral Geometry measures 
+│   │   └── noelEval.py          # Calculation of Noel's Spectral Geometry measures
 │   │
 │   └── training.py              # ML training
 │
-├── notebooks/                   
-|   ├── 01_data_generation.ipynb      
-│   ├── 02_eda.ipynb             
-│   ├── 03_feature_extraction.ipynb 
-│   ├── 03_statistics.ipynb      
-│   ├── 04_training.ipynb        
-│   ├── 05_visualization.ipynb      
-│   
+├── notebooks/
+│   ├── 01_data_generation.ipynb
+│   ├── 02_eda.ipynb
+│   ├── 03_feature_extraction.ipynb
+│   ├── 03_statistics.ipynb
+│   ├── 04_training.ipynb
+│   ├── 05_visualization.ipynb
+│
 ├── requirements.txt
 └── README.md
