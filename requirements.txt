@@ -1,0 +1,10 @@
+# requirements.txt
+transformers>=4.40.0
+accelerate
+bitsandbytes
+datasets
+openai
+tqdm
+pandas
+matplotlib
+seaborn
