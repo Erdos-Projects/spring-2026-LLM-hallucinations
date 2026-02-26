@@ -47,6 +47,19 @@ def load_math(sample_size=2000):
         "dataset": "math"
     } for r in ds]
 
+def load_halueval(sample_size=2000):
+    """
+    Retrieve random sample of the HaluEval (QA) benchmark.
+    """
+    ds = load_dataset("pminervini/HaluEval", "qa", split="data")
+    ds = ds.shuffle(seed=42).select(range(min(sample_size, len(ds))))
+    
+    return [{
+        "question": f"Context: {r['knowledge']}\n\nQuestion: {r['question']}", 
+        "reference_answer": r["right_answer"], 
+        "dataset": "halueval"
+    } for r in ds]
+
 def load_json_file(target_jsonl_path):
     """Parses a .jsonl file, queries the JSON API, and rewrites the matrix."""
     with open(target_jsonl_path, "r") as file_stream:
