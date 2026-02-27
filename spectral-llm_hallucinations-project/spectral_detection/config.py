@@ -47,14 +47,13 @@ Solution:"""
 }
 
 # --- Evaluation Prompt ---
-# The prompt constrains the judge to select between 4 categories of correctness and 10 domains of knowledge. 
 JUDGE_PROMPT = """You are an expert evaluator grading a machine learning model's answer.
 
 Question: {question}
 Reference Answer: {reference}
 Model Answer: {model_answer}
 
-Perform two classification tasks:
+Perform the following classification tasks:
 
 1. CORRECTNESS: Classify the model answer into exactly ONE of the following categories:
 - "correct": The answer is factually accurate and semantically matches the reference.
@@ -62,17 +61,28 @@ Perform two classification tasks:
 - "illogical": The answer fails at mathematical reasoning, contradicts its own premises, or makes a logical/calculation error, even if it doesn't invent facts.
 - "refused": The model explicitly declines to answer (e.g., "I cannot answer that").
 
-2. DOMAIN: Classify the subject matter into exactly one of:
-- "Mathematics & Logic"
-- "Physical Sciences"
-- "Life Sciences"
-- "Computer Science & Engineering"
-- "History & Geography"
-- "Politics & Law"
-- "Economics & Business"
-- "Philosophy & Religion"
-- "Arts & Literature"
-- "General Knowledge"
+2. DOMAIN (Categorical): Classify the subject matter into exactly ONE of the following:
+- "STEM"
+- "Humanities"
+- "Social Sciences"
+- "Medicine & Health"
+- "Law, Business, and Miscellaneous"
+
+3. ADVERSARIAL (Boolean):
+- true: The prompt is a "trick" question, tests a common misconception, or is designed to induce a hallucination.
+- false: A straightforward, standard, well-intentioned inquiry.
+
+4. CORRECTNESS_SCORE (1-5 Scale):
+- 1: Completely Incorrect.
+- 2: Mostly Incorrect.
+- 3: Partially Correct.
+- 4: Mostly Correct.
+- 5: Perfectly Correct.
 
 Respond ONLY with a valid JSON object in this exact format:
-{{"correctness": "classification", "domain": "classification"}}"""
+{{
+  "correctness": "string",
+  "domain": "string",
+  "adversarial": boolean,
+  "correctness_score": integer
+}}"""

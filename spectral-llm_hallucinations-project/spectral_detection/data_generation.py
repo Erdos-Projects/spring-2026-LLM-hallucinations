@@ -6,6 +6,8 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from openai import OpenAI
 from . import config
+from tqdm.contrib.logging import logging_redirect_tqdm
+from spectral_detection.data import features
 
 class Pipeline:
     def __init__(self):
@@ -44,29 +46,39 @@ class Pipeline:
         # Any other case would be factual
         return config.PROMPTS["factual"].format(question=record["question"])
 
-    def generate_dataset(self, answers_per_prompt, data_list, dataset_name, temperature, overwrite=False):
-        """
-        Computes response sequences and saves states to a target .jsonl file.
-        If overwrite=True, any existing file for this configuration is destroyed 
-        before execution begins.
+    def generate_dataset(self, answers_per_prompt, data_list, dataset_name, temperature, 
+                     overwrite=False, extract_laplacian=False, num_top_eigenvalues=10):                      
+        """Computes response sequences and saves states to a target .jsonl file.
+        If extract_laplacian=True, all eigenvalue arrays are accumulated in memory 
+        and saved as a single PyTorch binary dictionary at the end.
         """        
         output_file = config.CHECKPOINT_DIR / f"{dataset_name}_t{temperature}_n{answers_per_prompt}.jsonl"
+        eigen_file = config.CHECKPOINT_DIR / f"{dataset_name}_t{temperature}_n{answers_per_prompt}_eigen.pt"
 
-        # --- OVERWRITE LOGIC ---
-        if overwrite and output_file.exists():
-            output_file.unlink()
-            print(f"Existing file {output_file.name} deleted. Starting fresh.")
+        if overwrite:
+            if output_file.exists():
+                output_file.unlink()
+                print(f"Existing file {output_file.name} deleted.")
+            if eigen_file.exists():
+                eigen_file.unlink()
+                print(f"Existing features file {eigen_file.name} deleted.")
         
+        # --- RESUME LOGIC ---
         finished_ids = set()
         if output_file.exists():
             with open(output_file, "r") as f:
                 finished_ids = {json.loads(line)["id"] for line in f if line.strip()}
                 
+        laplacian_features_dict = {}
+        if extract_laplacian and eigen_file.exists():
+            laplacian_features_dict = torch.load(eigen_file, weights_only=True)
+
         with open(output_file, "a") as file_stream:
             for i, record in enumerate(tqdm(data_list, desc=f"Generating {dataset_name}")):
                 unique_identifier = f"{dataset_name}_{i:05d}_t{temperature}"
                 
-                if unique_identifier in finished_ids:
+                # Check if the first stochastic sample is already processed
+                if f"{unique_identifier}_ans00" in finished_ids:
                     continue
                 
                 prompt_text = self._format_prompt(record)
@@ -89,18 +101,19 @@ class Pipeline:
                     )
                 
                 for ans_id, output_sequence in enumerate(outputs):
-                    # Slice the tensor to remove the input prompt tokens
                     generated_tokens = output_sequence[input_length:]
+                    answer_id = f"{unique_identifier}_ans{ans_id:02d}"
 
-                    # Raw string
+                    # --- SPECTRAL EXTRACTION ---
+                    if extract_laplacian:
+                        extract_laplacian(self.model, laplacian_features_dict, num_top_eigenvalues, output_sequence, answer_id)
+                
                     raw_answer = self.tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
-                    
-                    # Splits string at the first newline (Llama produces additional non-sense lines)
                     clean_answer = raw_answer.split("\n")[0].split("Question:")[0].strip()
                 
                     result = {
-                        "id" : f"{unique_identifier}_ans{ans_id:02d}", # <=== Fully unique ID
-                        "prompt_id" : unique_identifier,               # <=== Groups the 20 samples
+                        "id" : answer_id, 
+                        "prompt_id" : unique_identifier,               
                         "sample_num" : f"sample{ans_id:02d}",
                         "dataset" : dataset_name,
                         "question" : record["question"],
@@ -114,11 +127,17 @@ class Pipeline:
                         "domain" : record.get("domain", "") if dataset_name == "defan" else ""
                     }
                     
-                    # Write to disk
                     file_stream.write(json.dumps(result) + "\n")
             
                 if i % 5 == 0: 
                     file_stream.flush()
+        
+        # --- FINAL SAVE ---
+        # After the loop finishes, save the entire dictionary to a single binary file
+        if extract_laplacian:
+            print(f"Saving {len(laplacian_features_dict)} spectral tensors to {eigen_file.name}...")
+            torch.save(laplacian_features_dict, eigen_file)
+            
 
 class LLMJudge:
     def __init__(self, api_key):
@@ -133,42 +152,48 @@ class LLMJudge:
             records = [json.loads(line) for line in file_stream]
         
         updated_records = []
-        for record in tqdm(records, desc="Evaluating JSONL"):
-            if "correctness" not in record:
-                try:
-                    # Improve inputs to prevent .format() from crashing on curly braces from LATEX outputs
-                    safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
-                    safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
-                    safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
+        
+        with logging_redirect_tqdm():
+            for record in tqdm(records, desc="Evaluating JSONL", mininterval=60.0):
+                if "correctness_score" not in record or record["correctness_score"] == "error":
+                    try:
+                        # Improve inputs to prevent .format() from crashing on curly braces from LATEX outputs
+                        safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
+                        safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
+                        safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
 
-                    prompt = config.JUDGE_PROMPT.format(
-                        question=safe_q, 
-                        reference=safe_ref,
-                        model_answer=safe_ans
-                    )
-                    
-                    # Call GPT-4o-mini
-                    response = self.client.chat.completions.create(
-                        model=config.JUDGE_MODEL_ID,
-                        response_format={"type": "json_object"},
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=0
-                    )
-                    
-                    eval_data = json.loads(response.choices[0].message.content)
-                    record["correctness"] = eval_data.get("correctness", "unknown").lower()
-                    record["domain"] = eval_data.get("domain", "unknown")
+                        prompt = config.JUDGE_PROMPT.format(
+                            question=safe_q, 
+                            reference=safe_ref,
+                            model_answer=safe_ans
+                        )
                         
-                except Exception:
-                    record["correctness"] = "error"
-                    record["domain"] = "error"
-            
-            updated_records.append(record)
-            
-        # Save back evaluation from judge
-        with open(target_jsonl_path, "w") as file_stream:
-            for record in updated_records: 
-                file_stream.write(json.dumps(record) + "\n")
+                        # Call GPT-4o-mini
+                        response = self.client.chat.completions.create(
+                            model=config.JUDGE_MODEL_ID,
+                            response_format={"type": "json_object"},
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0
+                        )
+                        
+                        eval_data = json.loads(response.choices[0].message.content)
+                        record["correctness"] = eval_data.get("correctness", "unknown").lower()
+                        record["domain"] = eval_data.get("domain", "unknown")
+                        record["adversarial"] = eval_data.get("adversarial", False)
+                        record["correctness_score"] = eval_data.get("correctness_score", -1)
+
+                    except Exception:
+                        record["correctness"] = "error"
+                        record["domain"] = "error"
+                        record["adversarial"] = "error" 
+                        record["correctness_score"] = "error"
+                
+                updated_records.append(record)
+                
+            # Save back evaluation from judge
+            with open(target_jsonl_path, "w") as file_stream:
+                for record in updated_records: 
+                    file_stream.write(json.dumps(record) + "\n")
                 
     def test_judge(self, record):
         """
