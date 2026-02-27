@@ -161,7 +161,7 @@ class Pipeline:
 
         return feat
 
-        def generate_dataset_with_judge_and_eigs(
+    def generate_dataset_with_judge_and_eigs(
         self,
         answers_per_prompt,
         data_list,
@@ -171,14 +171,13 @@ class Pipeline:
         save_pt_path,
         k_eigenvalues: int = 10,
         overwrite_pt: bool = False,
-        overwrite_jsonl: bool = False,
-    ):
+        overwrite_jsonl: bool = False):
         """
         One-pass pipeline:
-          - generate answers
-          - compute eigenfeatures for the exact generated token sequence
-          - judge the decoded answer via OpenAI
-          - save compact .pt: data[id] = {label, domain, eig_top10}
+        - generate answers
+        - compute eigenfeatures for the exact generated token sequence
+        - judge the decoded answer via OpenAI
+        - save compact .pt: data[id] = {label, domain, eig_top10}
 
         Optionally also writes/maintains the JSONL (same format as your current generate_dataset()).
         """
