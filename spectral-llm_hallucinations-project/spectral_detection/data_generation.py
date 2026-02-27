@@ -6,6 +6,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from openai import OpenAI
 from . import config
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 class Pipeline:
     def __init__(self):
@@ -133,42 +134,44 @@ class LLMJudge:
             records = [json.loads(line) for line in file_stream]
         
         updated_records = []
-        for record in tqdm(records, desc="Evaluating JSONL"):
-            if "correctness" not in record:
-                try:
-                    # Improve inputs to prevent .format() from crashing on curly braces from LATEX outputs
-                    safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
-                    safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
-                    safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
+        
+        with logging_redirect_tqdm():
+            for record in tqdm(records, desc="Evaluating JSONL", mininterval=60.0):
+                if "correctness" not in record:
+                    try:
+                        # Improve inputs to prevent .format() from crashing on curly braces from LATEX outputs
+                        safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
+                        safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
+                        safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
 
-                    prompt = config.JUDGE_PROMPT.format(
-                        question=safe_q, 
-                        reference=safe_ref,
-                        model_answer=safe_ans
-                    )
-                    
-                    # Call GPT-4o-mini
-                    response = self.client.chat.completions.create(
-                        model=config.JUDGE_MODEL_ID,
-                        response_format={"type": "json_object"},
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=0
-                    )
-                    
-                    eval_data = json.loads(response.choices[0].message.content)
-                    record["correctness"] = eval_data.get("correctness", "unknown").lower()
-                    record["domain"] = eval_data.get("domain", "unknown")
+                        prompt = config.JUDGE_PROMPT.format(
+                            question=safe_q, 
+                            reference=safe_ref,
+                            model_answer=safe_ans
+                        )
                         
-                except Exception:
-                    record["correctness"] = "error"
-                    record["domain"] = "error"
-            
-            updated_records.append(record)
-            
-        # Save back evaluation from judge
-        with open(target_jsonl_path, "w") as file_stream:
-            for record in updated_records: 
-                file_stream.write(json.dumps(record) + "\n")
+                        # Call GPT-4o-mini
+                        response = self.client.chat.completions.create(
+                            model=config.JUDGE_MODEL_ID,
+                            response_format={"type": "json_object"},
+                            messages=[{"role": "user", "content": prompt}],
+                            temperature=0
+                        )
+                        
+                        eval_data = json.loads(response.choices[0].message.content)
+                        record["correctness"] = eval_data.get("correctness", "unknown").lower()
+                        record["domain"] = eval_data.get("domain", "unknown")
+                            
+                    except Exception:
+                        record["correctness"] = "error"
+                        record["domain"] = "error"
+                
+                updated_records.append(record)
+                
+            # Save back evaluation from judge
+            with open(target_jsonl_path, "w") as file_stream:
+                for record in updated_records: 
+                    file_stream.write(json.dumps(record) + "\n")
                 
     def test_judge(self, record):
         """
