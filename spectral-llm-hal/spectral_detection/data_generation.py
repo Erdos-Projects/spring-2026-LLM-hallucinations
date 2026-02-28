@@ -26,7 +26,7 @@ class Pipeline:
         self.model = AutoModelForCausalLM.from_pretrained(
             config.LLAMA_MODEL_ID,
             quantization_config=quant_config,
-            device_map="auto" # Automatically puts model on GPU
+            device_map="auto", # Automatically puts model on GPU
             attn_implementation="eager"
         )
         self.model.eval()
