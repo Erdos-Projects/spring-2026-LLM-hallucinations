@@ -27,8 +27,11 @@ class Pipeline:
             config.LLAMA_MODEL_ID,
             quantization_config=quant_config,
             device_map="auto" # Automatically puts model on GPU
+            attn_implementation="eager"
         )
         self.model.eval()
+        self.model.config.output_attentions = True
+        self.model.config.return_dict = True
 
     def _format_prompt(self, record):
         ds = record["dataset"]
@@ -138,9 +141,12 @@ class Pipeline:
             use_cache=False,
             return_dict=True,
         )
+        attns = out.attentions
+        if attns is None:
+            raise RuntimeError("Attentions are still None even with eager attention.")
 
         # [L, 1, H, T, T] -> [L, H, T, T]
-        A = torch.stack(out.attentions, dim=0).squeeze(1)
+        A = torch.stack(attns, dim=0).squeeze(1)
         _, _, T_len, _ = A.shape
 
         col_sums = A.sum(dim=-2)  # [L, H, T]
