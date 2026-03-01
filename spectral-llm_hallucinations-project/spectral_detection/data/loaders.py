@@ -7,8 +7,9 @@ def extract_boxed_solution(solution_str):
     match = re.search(r"\\boxed\{(.+?)\}", str(solution_str))
     return match.group(1) if match else solution_str
 
-def load_truthfulqa():
+def load_truthfulqa(sample_size=817):
     ds = load_dataset("truthfulqa/truthful_qa", "generation", split="validation")
+    ds = ds.shuffle(seed=42).select(range(min(sample_size, len(ds))))
     return [{"question": r["question"], 
              "reference_answer": r["best_answer"], 
              "dataset": "truthfulqa"} for r in ds]
