@@ -1,6 +1,7 @@
 # spectral_detection/data_generation.py
 import json
 import time
+import os
 from pathlib import Path
 from tqdm import tqdm
 import torch
@@ -9,6 +10,9 @@ from openai import OpenAI
 from . import config
 from tqdm.contrib.logging import logging_redirect_tqdm
 from spectral_detection.data import features
+import asyncio
+from openai import AsyncOpenAI
+from tqdm.asyncio import tqdm as async_tqdm
 
 class Pipeline:
     def __init__(self):
@@ -110,7 +114,7 @@ class Pipeline:
 
                     # --- SPECTRAL EXTRACTION ---
                     if extract_laplacian:
-                        extract_laplacian(self.model, laplacian_features_dict, num_top_eigenvalues, output_sequence, answer_id)
+                        features.extract_laplacian(self.model, laplacian_features_dict, num_top_eigenvalues, output_sequence, answer_id)
                 
                     raw_answer = self.tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
                     clean_answer = raw_answer.split("\n")[0].split("Question:")[0].strip()
@@ -208,7 +212,7 @@ class Pipeline:
         save_pt_path = Path(save_pt_path)
 
         # Optional JSONL output for traceability
-        output_file = config.CHECKPOINT_DIR / f"{dataset_name}_t{temperature}_n{answers_per_prompt}.jsonl"
+        output_file = config.CHECKPOINT_DIR / f"{dataset_name}_t{temperature}_n{answers_per_prompt}_eigen.jsonl"
         if overwrite_jsonl and output_file.exists():
             output_file.unlink()
 
@@ -280,18 +284,25 @@ class Pipeline:
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0,
                         )
-                        eval_data = json.loads(response.choices[0].message.content)
+                        eval_data = json.loads(response.choices[0].message.content)                   
                         correctness = str(eval_data.get("correctness", "unknown")).lower()
                         domain = str(eval_data.get("domain", "unknown"))
+                        adversarial = eval_data.get("adversarial", False)
+                        correctness_score = eval_data.get("correctness_score", -1)
+                        
                     except Exception:
                         correctness = "error"
                         domain = "error"
+                        adversarial = False
+                        correctness_score = -1
 
                     # ---- Save compact PT entry ----
                     pt_data[record_id] = {
-                        "label": correctness,     # judge label
-                        "domain": domain,         # judge domain (optional)
-                        "eig_top10": eig_feat,    # float16 [L*H*10]
+                        "label": correctness,           # judge label
+                        "domain": domain,               # judge domain
+                        "adversarial": adversarial,     # boolean
+                        "score": correctness_score,     # integer
+                        "eig_top10": eig_feat,          # float16 [L*H*10]
                     }
                     finished_ids.add(record_id)
 
@@ -306,6 +317,8 @@ class Pipeline:
                         "model_answer": clean_answer,
                         "correctness": correctness,
                         "domain": domain,
+                        "adversarial": adversarial,
+                        "correctness_score": correctness_score,
                         "temperature": temperature,
                         "prompt_tokens": input_length,
                         "generated_tokens": len(generated_tokens),
@@ -313,7 +326,6 @@ class Pipeline:
                         "type": record.get("type", "") if dataset_name == "defan" else "",
                     }
                     file_stream.write(json.dumps(result) + "\n")
-
                     # Periodic checkpoint for safety
                     if len(pt_data) % 50 == 0:
                         payload = {
@@ -361,18 +373,29 @@ class LLMJudge:
         """
         self.client = OpenAI(api_key=api_key)
 
-    def evaluate_file(self, target_jsonl_path):
+    def _atomic_save(self, records, target_path):
+        """
+        Atomic save
+        """
+        temp_path = str(target_path) + ".tmp"
+        with open(temp_path, "w") as file_stream:
+            for record in records: 
+                file_stream.write(json.dumps(record) + "\n")
+        
+        os.replace(temp_path, target_path)
+
+    def evaluate_file(self, target_jsonl_path, save_interval=500):
         """Parses the existing .jsonl file, queries the JSON API, and rewrites the matrix."""
         with open(target_jsonl_path, "r") as file_stream:
             records = [json.loads(line) for line in file_stream]
         
-        updated_records = []
+        unsaved_changes = False
         
         with logging_redirect_tqdm():
-            for record in tqdm(records, desc="Evaluating JSONL", mininterval=60.0):
+            for i, record in enumerate(tqdm(records, desc="Evaluating JSONL", mininterval=60.0)):
                 if "correctness_score" not in record or record["correctness_score"] == "error":
                     try:
-                        # Improve inputs to prevent .format() from crashing on curly braces from LATEX outputs
+                        # Prevent .format() from crashing on LATEX curly braces
                         safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
                         safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
                         safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
@@ -392,63 +415,112 @@ class LLMJudge:
                         )
                         
                         eval_data = json.loads(response.choices[0].message.content)
-                        record["correctness"] = eval_data.get("correctness", "unknown").lower()
-                        record["domain"] = eval_data.get("domain", "unknown")
+                        record["correctness"] = str(eval_data.get("correctness", "unknown")).lower()
+                        record["domain"] = str(eval_data.get("domain", "unknown"))
                         record["adversarial"] = eval_data.get("adversarial", False)
                         record["correctness_score"] = eval_data.get("correctness_score", -1)
-
+                        
                     except Exception:
                         record["correctness"] = "error"
                         record["domain"] = "error"
-                        record["adversarial"] = "error" 
-                        record["correctness_score"] = "error"
+                        record["adversarial"] = False
+                        record["correctness_score"] = -1
+                        
+                    unsaved_changes = True
                 
-                updated_records.append(record)
-                
-            # Save back evaluation from judge
-            with open(target_jsonl_path, "w") as file_stream:
-                for record in updated_records: 
-                    file_stream.write(json.dumps(record) + "\n")
-                
-    def test_judge(self, record):
-        """
-        Diagnostic method to isolate and print exact API or formatting errors.
-        Pass a single dictionary record to this method.
-        """
-        import traceback
-        print("\n--- Diagnostic: Testing Judge ---")
-        
-        try:
-            print("[1] Attempting to format prompt...")
-            safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
-            safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
-            safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
+                # Periodic saves to disk
+                if unsaved_changes and (i + 1) % save_interval == 0:
+                    self._atomic_save(records, target_jsonl_path)
+                    unsaved_changes = False
+                    
+            # Final sweep to commit any residual records at loop termination
+            if unsaved_changes:
+                self._atomic_save(records, target_jsonl_path)
 
-            prompt = config.JUDGE_PROMPT.format(
-                question=safe_q, 
-                reference=safe_ref,
-                model_answer=safe_ans
-            )
+class AsyncLLMJudge:
+    def __init__(self, api_key: str):
+        """
+        Strictly asynchronous client for non-blocking I/O operations.
+        """
+        self.async_client = AsyncOpenAI(api_key=api_key)
+
+    def _atomic_save(self, records: list, target_path: str):
+        """
+        Executes kernel-level atomic file replacement to prevent data corruption.
+        """
+        temp_path = str(target_path) + ".tmp"
+        with open(temp_path, "w") as file_stream:
+            for record in records: 
+                file_stream.write(json.dumps(record) + "\n")
+        
+        os.replace(temp_path, target_path)
+
+    async def _evaluate_single(self, record: dict, semaphore: asyncio.Semaphore) -> bool:
+        """
+        An isolated coroutine mapping a single record to an API response.
+        Returns True if the record's state was modified, False otherwise.
+        """
+        # Skip previously verified states
+        if "correctness_score" in record and record["correctness_score"] not in ["error", -1]:
+            return False
+
+        async with semaphore:
+            try:
+                # Sanitize LaTeX curly braces for the string formatter
+                safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
+                safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
+                safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
+
+                prompt = config.JUDGE_PROMPT.format(
+                    question=safe_q, 
+                    reference=safe_ref,
+                    model_answer=safe_ans
+                )
+                
+                # Non-blocking network call
+                response = await self.async_client.chat.completions.create(
+                    model=config.JUDGE_MODEL_ID,
+                    response_format={"type": "json_object"},
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0
+                )
+                
+                eval_data = json.loads(response.choices[0].message.content)
+                record["correctness"] = str(eval_data.get("correctness", "unknown")).lower()
+                record["domain"] = str(eval_data.get("domain", "unknown"))
+                record["adversarial"] = eval_data.get("adversarial", False)
+                record["correctness_score"] = eval_data.get("correctness_score", -1)
+                
+            except Exception:
+                record["correctness"] = "error"
+                record["domain"] = "error"
+                record["adversarial"] = False
+                record["correctness_score"] = -1
+                
+            return True
+
+    async def evaluate_file_async(self, target_jsonl_path: str, save_interval: int = 500, max_concurrent: int = 50):
+        """
+        Partitions the discrete set of records into distinct batches. Dispatches each batch 
+        concurrently, awaiting resolution before executing an atomic disk write.
+        """
+        with open(target_jsonl_path, "r") as file_stream:
+            records = [json.loads(line) for line in file_stream]
+        
+        # Bounding the concurrency space to prevent HTTP 429 errors
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        for i in range(0, len(records), save_interval):
+            batch = records[i:i + save_interval]
             
-            print("Success. Prompt preview (first 100 chars):")
-            print(prompt[:100] + "...\n")
+            # Construct the set of unexecuted coroutines
+            tasks = [self._evaluate_single(record, semaphore) for record in batch]
             
-            print("[2] Calling OpenAI API...")
-            response = self.client.chat.completions.create(
-                model=config.JUDGE_MODEL_ID,
-                response_format={"type": "json_object"},
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0
-            )
-            raw_content = response.choices[0].message.content
-            print("Success. Raw API Response:")
-            print(raw_content + "\n")
+            # Execute concurrently and await completion of the batch vector
+            results = await async_tqdm.gather(*tasks, desc=f"Evaluating Batch {(i//save_interval)+1}")
             
-            print("[3] Attempting JSON parsing...")
-            eval_data = json.loads(raw_content)
-            print("Success. Parsed Data:")
-            print(eval_data)
-            
-        except Exception as e:
-            print("\n!!! ERROR ENCOUNTERED !!!")
-            traceback.print_exc() # This prints the exact line and cause of the crash
+            # If any element evaluates to True, trigger the atomic disk write
+            if any(results):
+                self._atomic_save(records, target_jsonl_path)
+
+        print(f"\nAsynchronous evaluation complete for {target_jsonl_path}")
