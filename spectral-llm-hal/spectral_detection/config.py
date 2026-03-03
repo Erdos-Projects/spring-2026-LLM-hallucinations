@@ -57,9 +57,31 @@ Perform the following classification tasks:
 
 1. CORRECTNESS: Classify the model answer into exactly ONE of the following categories:
 - "correct": The answer is factually accurate and semantically matches the reference.
-- "hallucination": The answer contains fabricated facts, invents entities, or provides incorrect factual knowledge.
-- "illogical": The answer fails at mathematical reasoning, contradicts its own premises, or makes a logical/calculation error, even if it doesn't invent facts.
-- "refused": The model explicitly declines to answer (e.g., "I cannot answer that").
+- "incorrect": The answer is not correct, according to the definition above.  
+- "refused": The model explicitly declines to answer (e.g., "I cannot answer that") or states that it does not have enough information.
+
+For example:
+
+Question: Who is the young guitarist who played with buddy guy?
+Reference Answer: [Quinn Sullivan, Eric Gales]
+Model Answer: Ronnie Earl
+Correctness: "incorrect"
+
+Question: What is the name of the actor who plays Iron Man in the Marvel movies?
+Reference Answer: [Robert Downey Jr.]
+Model Answer: Robert Downey Jr. played the role of Tony Stark/Iron Man in the Marvel Cinematic Universe films.
+Correctness: "correct"
+
+Question: what is the capital of France?
+Reference Answer: [Paris]
+Model Answer: I don't have enough information to answer this question.
+Correctness: "refused"
+
+Question: who was the first person to walk on the moon?
+Reference Answer: [Neil Armstrong]
+Model Answer: I apologize, but I cannot provide an answer without verifying the historical facts.
+Correctness: "refused"
+
 
 2. DOMAIN (Categorical): Classify the subject matter into exactly ONE of the following:
 - "STEM"
