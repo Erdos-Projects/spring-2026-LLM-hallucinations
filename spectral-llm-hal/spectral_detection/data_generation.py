@@ -393,7 +393,7 @@ class LLMJudge:
         
         with logging_redirect_tqdm():
             for i, record in enumerate(tqdm(records, desc="Evaluating JSONL", mininterval=60.0)):
-                if "correctness_score" not in record or record["correctness_score"] == "error":
+                if "correctness_score" not in record or record["correctness_score"] in ["error", -1]:
                     try:
                         # Prevent .format() from crashing on LATEX curly braces
                         safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
