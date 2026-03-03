@@ -1,0 +1,19 @@
+Domain,Classifier,AUC_mean,AUC_std,n_questions
+Arts & Literature,Logistic Regression,0.9466666666666667,0.10666666666666666,40
+Arts & Literature,Random Forest,0.9341666666666667,0.10329300288230776,40
+Arts & Literature,XGBoost,0.9466666666666667,0.07774602526460399,40
+Economics & Business,Logistic Regression,0.6666666666666666,0.4714045207910317,14
+Economics & Business,Random Forest,0.611111111111111,0.28327886186626583,14
+Economics & Business,XGBoost,0.5,0.0,14
+General Knowledge,Logistic Regression,0.9730902777777779,0.02428351109063917,180
+General Knowledge,Random Forest,0.9723090277777778,0.019561292385615974,180
+General Knowledge,XGBoost,0.9728614267676768,0.018010696740053178,180
+History & Geography,Logistic Regression,0.9196232985121874,0.03179644571054064,178
+History & Geography,Random Forest,0.8993668882557773,0.05232769104559856,178
+History & Geography,XGBoost,0.9135723330167774,0.06788341397084512,178
+Mathematics & Logic,Logistic Regression,0.8,0.18708286933869706,30
+Mathematics & Logic,Random Forest,0.775,0.1224744871391589,30
+Mathematics & Logic,XGBoost,0.575,0.25433737436719756,30
+Physical Sciences,Logistic Regression,1.0,0.0,10
+Physical Sciences,Random Forest,1.0,0.0,10
+Physical Sciences,XGBoost,0.5,0.0,10
