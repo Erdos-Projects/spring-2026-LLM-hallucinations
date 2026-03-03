@@ -11,7 +11,7 @@ for path in [BASE_DIR, CHECKPOINT_DIR, DATA_PROCESSED]:
 
 # --- Hyperparameters & Identifiers ---
 LLAMA_MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
-JUDGE_MODEL_ID = "gpt-4o-mini"
+JUDGE_MODEL_ID = "gpt-4o-mini" # "or gpt-4.1-nano"
 
 
 # --- Hyperparameters ---

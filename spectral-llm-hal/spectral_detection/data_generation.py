@@ -384,58 +384,60 @@ class LLMJudge:
         
         os.replace(temp_path, target_path)
 
-    def evaluate_file(self, target_jsonl_path, save_interval=500):
+    def evaluate_file(self, target_jsonl_path, save_interval=500, judge_config = config.JUDGE_MODEL_ID):
         """Parses the existing .jsonl file, queries the JSON API, and rewrites the matrix."""
         with open(target_jsonl_path, "r") as file_stream:
             records = [json.loads(line) for line in file_stream]
         
-        unsaved_changes = False
-        
-        with logging_redirect_tqdm():
-            for i, record in enumerate(tqdm(records, desc="Evaluating JSONL", mininterval=60.0)):
-                if "correctness_score" not in record or record["correctness_score"] in ["error", -1]:
-                    try:
-                        # Prevent .format() from crashing on LATEX curly braces
-                        safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
-                        safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
-                        safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
+        new_changes_count = 0
+        pending = [r for r in records if "correctness_score" not in r or r["correctness_score"] in ["error", -1]]
+        print(f"Total: {len(records)} | Pending: {len(pending)}")
 
-                        prompt = config.JUDGE_PROMPT.format(
-                            question=safe_q, 
-                            reference=safe_ref,
-                            model_answer=safe_ans
-                        )
-                        
-                        # Call GPT-4o-mini
-                        response = self.client.chat.completions.create(
-                            model=config.JUDGE_MODEL_ID,
-                            response_format={"type": "json_object"},
-                            messages=[{"role": "user", "content": prompt}],
-                            temperature=0
-                        )
-                        
-                        eval_data = json.loads(response.choices[0].message.content)
-                        record["correctness"] = str(eval_data.get("correctness", "unknown")).lower()
-                        record["domain"] = str(eval_data.get("domain", "unknown"))
-                        record["adversarial"] = eval_data.get("adversarial", False)
-                        record["correctness_score"] = eval_data.get("correctness_score", -1)
-                        
-                    except Exception:
-                        record["correctness"] = "error"
-                        record["domain"] = "error"
-                        record["adversarial"] = False
-                        record["correctness_score"] = -1
-                        
-                    unsaved_changes = True
+        for i, record in enumerate(tqdm(pending, desc="Evaluating JSONL")):    
+            try:
+                # Prevent .format() from crashing on LATEX
+                safe_q = str(record["question"]).replace("{", "{{").replace("}", "}}")
+                safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
+                safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
+
+                prompt = config.JUDGE_PROMPT.format(
+                    question=safe_q, 
+                    reference=safe_ref,
+                    model_answer=safe_ans
+                )
                 
-                # Periodic saves to disk
-                if unsaved_changes and (i + 1) % save_interval == 0:
-                    self._atomic_save(records, target_jsonl_path)
-                    unsaved_changes = False
-                    
-            # Final sweep to commit any residual records at loop termination
-            if unsaved_changes:
+                # Call GPT-4o-mini or any other
+                response = self.client.chat.completions.create(
+                    model=judge_config,
+                    response_format={"type": "json_object"},
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0
+                )
+                
+                eval_data = json.loads(response.choices[0].message.content)
+                record["correctness"] = str(eval_data.get("correctness", "unknown")).lower()
+                record["domain"] = str(eval_data.get("domain", "unknown"))
+                record["adversarial"] = eval_data.get("adversarial", False)
+                record["correctness_score"] = eval_data.get("correctness_score", -1)
+                
+            except Exception as e:
+                # uncomment for ERROR print(f"[ERROR] {record.get('id', '?')}: {type(e).__name__}: {e}")
+                record["correctness"] = "error"
+                record["domain"] = "error"
+                record["adversarial"] = False
+                record["correctness_score"] = -1
+
+            new_changes_count += 1                                           
+            
+            # Periodic saves to disk                
+            if new_changes_count >= save_interval:
                 self._atomic_save(records, target_jsonl_path)
+                new_changes_count = 0
+                
+        # Save residual records
+        if new_changes_count > 0:
+            self._atomic_save(records, target_jsonl_path)\
+                
 
 class AsyncLLMJudge:
     def __init__(self, api_key: str):
@@ -446,7 +448,7 @@ class AsyncLLMJudge:
 
     def _atomic_save(self, records: list, target_path: str):
         """
-        Executes kernel-level atomic file replacement to prevent data corruption.
+        Executes atomic file replacement to prevent data corruption.
         """
         temp_path = str(target_path) + ".tmp"
         with open(temp_path, "w") as file_stream:
@@ -455,7 +457,7 @@ class AsyncLLMJudge:
         
         os.replace(temp_path, target_path)
 
-    async def _evaluate_single(self, record: dict, semaphore: asyncio.Semaphore) -> bool:
+    async def _evaluate_single(self, record: dict, semaphore: asyncio.Semaphore, judge) -> bool:
         """
         An isolated coroutine mapping a single record to an API response.
         Returns True if the record's state was modified, False otherwise.
@@ -463,6 +465,7 @@ class AsyncLLMJudge:
         # Skip previously verified states
         if "correctness_score" in record and record["correctness_score"] not in ["error", -1]:
             return False
+            
 
         async with semaphore:
             try:
@@ -479,7 +482,7 @@ class AsyncLLMJudge:
                 
                 # Non-blocking network call
                 response = await self.async_client.chat.completions.create(
-                    model=config.JUDGE_MODEL_ID,
+                    model=judge,
                     response_format={"type": "json_object"},
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
@@ -500,28 +503,19 @@ class AsyncLLMJudge:
                 
             return True
 
-    async def evaluate_file_async(self, target_jsonl_path: str, save_interval: int = 500, max_concurrent: int = 50):
-        """
-        Partitions the discrete set of records into distinct batches. Dispatches each batch 
-        concurrently, awaiting resolution before executing an atomic disk write.
-        """
-        with open(target_jsonl_path, "r") as file_stream:
-            records = [json.loads(line) for line in file_stream]
-        
-        # Bounding the concurrency space to prevent HTTP 429 errors
-        semaphore = asyncio.Semaphore(max_concurrent)
-        
-        for i in range(0, len(records), save_interval):
-            batch = records[i:i + save_interval]
-            
-            # Construct the set of unexecuted coroutines
-            tasks = [self._evaluate_single(record, semaphore) for record in batch]
-            
-            # Execute concurrently and await completion of the batch vector
-            results = await async_tqdm.gather(*tasks, desc=f"Evaluating Batch {(i//save_interval)+1}")
-            
-            # If any element evaluates to True, trigger the atomic disk write
-            if any(results):
-                self._atomic_save(records, target_jsonl_path)
+    async def evaluate_file_async(self, target_jsonl_path, save_interval=500, max_concurrent=50, judge_config=config.JUDGE_MODEL_ID):
+        with open(target_jsonl_path, "r") as f:
+            records = [json.loads(line) for line in f]
 
-        print(f"\nAsynchronous evaluation complete for {target_jsonl_path}")
+        # Filter for pending
+        pending = [r for r in records if "correctness_score" not in r or r["correctness_score"] in ["error", -1]]
+        print(f"Total: {len(records)} | Pending: {len(pending)}")
+        
+        semaphore = asyncio.Semaphore(max_concurrent)
+        for i in range(0, len(pending), save_interval):
+            batch = pending[i:i + save_interval]
+            tasks = [self._evaluate_single(r, semaphore, judge=judge_config) for r in batch]
+            await async_tqdm.gather(*tasks, desc=f"Batch {i//save_interval}")
+            
+            # Save the full state with updated pending records
+            self._atomic_save(records, target_jsonl_path)
