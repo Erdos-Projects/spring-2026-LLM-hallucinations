@@ -482,7 +482,8 @@ class AsyncLLMJudge:
                     model=config.JUDGE_MODEL_ID,
                     response_format={"type": "json_object"},
                     messages=[{"role": "user", "content": prompt}],
-                    temperature=0
+                    temperature=0,
+                    timeout=15.0 
                 )
                 
                 eval_data = json.loads(response.choices[0].message.content)
