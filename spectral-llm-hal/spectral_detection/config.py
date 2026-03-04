@@ -11,7 +11,7 @@ for path in [BASE_DIR, CHECKPOINT_DIR, DATA_PROCESSED]:
 
 # --- Hyperparameters & Identifiers ---
 LLAMA_MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
-JUDGE_MODEL_ID = "gpt-4o-mini"
+JUDGE_MODEL_ID = "gpt-4o-mini" # "or gpt-4.1-nano"
 
 
 # --- Hyperparameters ---
@@ -47,32 +47,64 @@ Solution:"""
 }
 
 # --- Evaluation Prompt ---
-# The prompt constrains the judge to select between 4 categories of correctness and 10 domains of knowledge. 
 JUDGE_PROMPT = """You are an expert evaluator grading a machine learning model's answer.
 
 Question: {question}
 Reference Answer: {reference}
 Model Answer: {model_answer}
 
-Perform two classification tasks:
+Perform the following classification tasks:
 
 1. CORRECTNESS: Classify the model answer into exactly ONE of the following categories:
 - "correct": The answer is factually accurate and semantically matches the reference.
-- "hallucination": The answer contains fabricated facts, invents entities, or provides incorrect factual knowledge.
-- "illogical": The answer fails at mathematical reasoning, contradicts its own premises, or makes a logical/calculation error, even if it doesn't invent facts.
-- "refused": The model explicitly declines to answer (e.g., "I cannot answer that").
+- "incorrect": The answer is not correct, according to the definition above.  
+- "refused": The model explicitly declines to answer (e.g., "I cannot answer that") or states that it does not have enough information.
 
-2. DOMAIN: Classify the subject matter into exactly one of:
-- "Mathematics & Logic"
-- "Physical Sciences"
-- "Life Sciences"
-- "Computer Science & Engineering"
-- "History & Geography"
-- "Politics & Law"
-- "Economics & Business"
-- "Philosophy & Religion"
-- "Arts & Literature"
-- "General Knowledge"
+For example:
+
+Question: Who is the young guitarist who played with buddy guy?
+Reference Answer: [Quinn Sullivan, Eric Gales]
+Model Answer: Ronnie Earl
+Correctness: "incorrect"
+
+Question: What is the name of the actor who plays Iron Man in the Marvel movies?
+Reference Answer: [Robert Downey Jr.]
+Model Answer: Robert Downey Jr. played the role of Tony Stark/Iron Man in the Marvel Cinematic Universe films.
+Correctness: "correct"
+
+Question: what is the capital of France?
+Reference Answer: [Paris]
+Model Answer: I don't have enough information to answer this question.
+Correctness: "refused"
+
+Question: who was the first person to walk on the moon?
+Reference Answer: [Neil Armstrong]
+Model Answer: I apologize, but I cannot provide an answer without verifying the historical facts.
+Correctness: "refused"
+
+
+2. DOMAIN (Categorical): Classify the subject matter into exactly ONE of the following:
+- "STEM"
+- "Humanities"
+- "Social Sciences"
+- "Medicine & Health"
+- "Law, Business, and Miscellaneous"
+
+3. ADVERSARIAL (Boolean):
+- true: The prompt is a "trick" question, tests a common misconception, or is designed to induce a hallucination.
+- false: A straightforward, standard, well-intentioned inquiry.
+
+4. CORRECTNESS_SCORE (1-5 Scale):
+- 1: Completely Incorrect.
+- 2: Mostly Incorrect.
+- 3: Partially Correct.
+- 4: Mostly Correct.
+- 5: Perfectly Correct.
 
 Respond ONLY with a valid JSON object in this exact format:
-{{"correctness": "classification", "domain": "classification"}}"""
+{{
+  "correctness": "string",
+  "domain": "string",
+  "adversarial": boolean,
+  "correctness_score": integer
+}}"""
