@@ -22,7 +22,7 @@ def load_triviaqa(sample_size=2000):
              "dataset": "triviaqa"} for r in ds]
 
 def load_defan(ds):
-    return [{"question" : r["questions"],
+    return [{"question" : r["question"],
              "reference_answer" : r["answer"],
              "type" : r["type"],
              "domain" : r["domain"],
