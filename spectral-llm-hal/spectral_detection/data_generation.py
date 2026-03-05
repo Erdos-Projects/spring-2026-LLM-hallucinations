@@ -104,7 +104,7 @@ class Pipeline:
                         temperature=temperature,
                         do_sample=(temperature > 0), 
                         pad_token_id=self.tokenizer.eos_token_id,
-                        top_p=0.95,  # Establishes the cumulative probability threshold used by Farquhar et al. 
+                        top_p=0.95,  # Establishes the cumulative probability threshold
                         num_return_sequences=answers_per_prompt # <=== Multiple answers per prompt
                     )
                 
@@ -112,9 +112,12 @@ class Pipeline:
                     generated_tokens = output_sequence[input_length:]
                     answer_id = f"{unique_identifier}_ans{ans_id:02d}"
 
-                    # --- SPECTRAL EXTRACTION ---
                     if extract_laplacian:
-                        features.extract_laplacian(self.model, laplacian_features_dict, num_top_eigenvalues, output_sequence, answer_id)
+                        laplacian_features_dict[answer_id] = features.extract_topk_laplacian_eigs(
+                            model=self.model,
+                            output_sequence_1d=output_sequence, 
+                            k=num_top_eigenvalues
+                        )
                 
                     raw_answer = self.tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
                     clean_answer = raw_answer.split("\n")[0].split("Question:")[0].strip()
@@ -124,6 +127,7 @@ class Pipeline:
                         "prompt_id" : unique_identifier,               
                         "sample_num" : f"sample{ans_id:02d}",
                         "dataset" : dataset_name,
+                        "topic_label" : record["topic_label"],
                         "question" : record["question"],
                         "reference_answer" : record["reference_answer"],
                         "model_answer" : clean_answer,
@@ -146,49 +150,6 @@ class Pipeline:
             print(f"Saving {len(laplacian_features_dict)} spectral tensors to {eigen_file.name}...")
             torch.save(laplacian_features_dict, eigen_file)
             
-        
-    # SPECTRAL / "EIGENVALUE" FEATURE EXTRACTION
-    @torch.no_grad()
-    def extract_topk_laplacian_eigs(self, output_sequence_1d: torch.Tensor, k: int = 10) -> torch.Tensor:
-        """
-        Compute top-k Laplacian-like "eigenvalues" from attentions for a *given* token sequence.
-        output_sequence_1d: shape [T] (full prompt+generated sequence, as returned by generate()).
-        Returns: float16 CPU tensor of shape [L*H*k].
-        """
-        input_ids = output_sequence_1d.unsqueeze(0).to(self.model.device)  # [1, T]
-
-        out = self.model(
-            input_ids=input_ids,
-            output_attentions=True,
-            use_cache=False,
-            return_dict=True,
-        )
-        attns = out.attentions
-        if attns is None:
-            raise RuntimeError("Attentions are still None even with eager attention.")
-
-        # [L, 1, H, T, T] -> [L, H, T, T]
-        A = torch.stack(attns, dim=0).squeeze(1)
-        _, _, T_len, _ = A.shape
-
-        col_sums = A.sum(dim=-2)  # [L, H, T]
-        denom = (T_len - torch.arange(T_len, device=A.device)).clamp_min(1)  # [T] (causal assumption)
-        d_ii = col_sums / denom
-        a_ii = torch.diagonal(A, dim1=-2, dim2=-1)  # [L, H, T]
-        eigenvalues = d_ii - a_ii  # [L, H, T]
-
-        k = min(int(k), T_len)
-        sorted_eigvals, _ = torch.sort(eigenvalues, dim=-1, descending=True)
-        top_k = sorted_eigvals[..., :k]  # [L, H, k]
-
-        feat = top_k.flatten().detach().cpu().to(torch.float16)
-
-        del out, A, col_sums, denom, d_ii, a_ii, eigenvalues, sorted_eigvals, top_k
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-        return feat
-
     def generate_dataset_with_judge_and_eigs(
         self,
         answers_per_prompt,
@@ -259,8 +220,8 @@ class Pipeline:
                     raw_answer = self.tokenizer.decode(generated_tokens, skip_special_tokens=True).strip()
                     clean_answer = raw_answer.split("\n")[0].split("Question:")[0].strip()
 
-                    # ---- EIGENFEATURES from the exact generated token sequence ----
-                    eig_feat = self.extract_topk_laplacian_eigs(
+                    eig_feat = features.extract_topk_laplacian_eigs(
+                        model=self.model,
                         output_sequence_1d=output_sequence,
                         k=k_eigenvalues,
                     )
