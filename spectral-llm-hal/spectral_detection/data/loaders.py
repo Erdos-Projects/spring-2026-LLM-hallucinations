@@ -13,7 +13,7 @@ def extract_gsm8k_solution(solution_str):
         return solution_str.split("####")[-1].strip()
     return solution_str
 
-def load_gsm8k(sample_size=1000):
+def load_gsm8k(sample_size=1319):
     """
     Retrieves the GSM8K benchmark. 
     """
@@ -24,6 +24,20 @@ def load_gsm8k(sample_size=1000):
         "reference_answer": extract_gsm8k_solution(r["answer"]),
         "dataset": "gsm8k",
         "topic_label": "math" 
+    } for r in ds]
+
+def load_nq_open(sample_size=3610):
+    """
+    Retrieves the validation set of the NQ-Open (Natural Questions Open) dataset.
+    """
+    ds = load_dataset("nq_open", split="validation")
+    ds = ds.shuffle(seed=42).select(range(min(sample_size, len(ds))))
+    
+    return [{
+        "question": r["question"],
+        "reference_answer": r["answer"], 
+        "dataset": "nq_open",
+        "topic_label": ""
     } for r in ds]
 
 def load_truthfulqa(sample_size=817):

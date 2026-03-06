@@ -345,7 +345,7 @@ class LLMJudge:
         
         os.replace(temp_path, target_path)
 
-    def evaluate_file(self, target_jsonl_path, save_interval=500, judge_config = config.JUDGE_MODEL_ID):
+    def evaluate_file(self, target_jsonl_path, save_interval=500, judge_config = config.JUDGE_MODEL_ID, judge_prompt = config.JUDGE_PROMPT):
         """Parses the existing .jsonl file, queries the JSON API, and rewrites the matrix."""
         with open(target_jsonl_path, "r") as file_stream:
             records = [json.loads(line) for line in file_stream]
@@ -361,7 +361,7 @@ class LLMJudge:
                 safe_ref = str(record["reference_answer"]).replace("{", "{{").replace("}", "}}")
                 safe_ans = str(record["model_answer"]).replace("{", "{{").replace("}", "}}")
 
-                prompt = config.JUDGE_PROMPT.format(
+                prompt = judge_prompt.format(
                     question=safe_q, 
                     reference=safe_ref,
                     model_answer=safe_ans

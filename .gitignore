@@ -1,0 +1,7 @@
+# Ignore all .txt files, except for strictly required documentation
+*.txt
+!readme.txt
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
