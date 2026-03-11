@@ -1,0 +1,23 @@
+Model,Approach,Split,AUC,Accuracy,F1
+Logistic Regression,Classification,Val,0.9028571428571429,0.9333333333333333,0.0
+Logistic Regression,Classification,Test,0.94,0.9466666666666667,0.3333333333333333
+Random Forest (cls),Classification,Val,0.9371428571428572,0.9333333333333333,0.2857142857142857
+Random Forest (cls),Classification,Test,0.98,0.9466666666666667,0.3333333333333333
+XGBoost (cls),Classification,Val,0.9028571428571428,0.9333333333333333,0.4444444444444444
+XGBoost (cls),Classification,Test,0.9371428571428572,0.9466666666666667,0.3333333333333333
+AdaBoost (cls),Classification,Val,0.877142857142857,0.8933333333333333,0.3333333333333333
+AdaBoost (cls),Classification,Test,0.9142857142857143,0.96,0.5714285714285714
+Ridge (reg->cls),Regression->Binary,Val,0.9342857142857143,0.9333333333333333,0.0
+Ridge (reg->cls),Regression->Binary,Test,0.94,0.9466666666666667,0.3333333333333333
+Lasso (reg->cls),Regression->Binary,Val,0.9057142857142857,0.9333333333333333,0.0
+Lasso (reg->cls),Regression->Binary,Test,0.937142857142857,0.9466666666666667,0.3333333333333333
+ElasticNet (reg->cls),Regression->Binary,Val,0.9,0.9333333333333333,0.0
+ElasticNet (reg->cls),Regression->Binary,Test,0.9342857142857143,0.9333333333333333,0.0
+Random Forest (reg->cls),Regression->Binary,Val,0.9171428571428571,0.92,0.25
+Random Forest (reg->cls),Regression->Binary,Test,0.9428571428571428,0.9333333333333333,0.0
+XGBoost (reg->cls),Regression->Binary,Val,0.9314285714285714,0.9066666666666666,0.2222222222222222
+XGBoost (reg->cls),Regression->Binary,Test,0.9371428571428572,0.96,0.5714285714285714
+SVR (RBF) (reg->cls),Regression->Binary,Val,0.9742857142857143,0.96,0.5714285714285714
+SVR (RBF) (reg->cls),Regression->Binary,Test,0.9457142857142857,0.9466666666666667,0.3333333333333333
+AdaBoost (reg->cls),Regression->Binary,Val,0.8957142857142857,0.92,0.25
+AdaBoost (reg->cls),Regression->Binary,Test,0.9285714285714286,0.9333333333333333,0.0

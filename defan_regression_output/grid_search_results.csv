@@ -1,0 +1,7 @@
+Model,Best_Params,Best_CV_Score
+Ridge,{'alpha': 0.1},0.476666368096195
+Lasso,{'alpha': 0.001},0.4752841407408285
+ElasticNet,"{'alpha': 0.005, 'l1_ratio': 0.2}",0.47423289479319825
+Random Forest,"{'max_depth': 4, 'n_estimators': 300}",0.5044178852551786
+XGBoost,"{'learning_rate': 0.08, 'max_depth': 4, 'n_estimators': 100}",0.5058686057563236
+AdaBoost,"{'learning_rate': 0.05, 'n_estimators': 200}",0.502816100059808
