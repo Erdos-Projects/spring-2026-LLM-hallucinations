@@ -459,6 +459,105 @@ def run_ablation(regressors_subset, sp, feat_train_df,
     return pd.DataFrame(rows)
 
 
+def run_ablation_cv(regressors_subset, feat_df, target_col="p_halluc",
+                    geo_features=None, extended_features=None,
+                    n_folds=5, seed=42, verbose=1):
+    """Run ablation over feature subsets x models using k-fold cross-validation.
+
+    Drop-in complement to run_ablation() — leaves the original untouched.
+    Instead of relying on a pre-existing train/val/test split, this pools
+    the full feat_df and evaluates each (variant, model) with stratified
+    k-fold CV, reporting mean ± std R² and MSE.
+
+    Parameters
+    ----------
+    regressors_subset : dict
+        {name: sklearn-compatible regressor} — will be cloned per fold.
+    feat_df : pd.DataFrame
+        Question-level feature dataframe (must contain target_col and
+        all columns referenced in geo_features / extended_features).
+    target_col : str
+        Regression target column (default ``'p_halluc'``).
+    geo_features : list[str], optional
+    extended_features : list[str], optional
+    n_folds : int
+        Number of CV folds (default 5).
+    seed : int
+    verbose : int
+        Print progress if > 0.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns: Variant, Model, Mean_CV_R2, Std_CV_R2, Mean_CV_MSE,
+        Std_CV_MSE, Features_Used.
+    """
+    from sklearn.base import clone
+
+    geo_features = geo_features or GEO_FEATURES
+    extended_features = (extended_features
+                         or geo_features + ["frac_refused", "score_mean", "len_mean"])
+
+    y_all = feat_df[target_col].values
+    # Stratify on binarised target for balanced folds
+    y_bin = (y_all > 0.5).astype(int)
+    cv = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+
+    ablation_sets = {
+        "Entropy only (H_sem)":    ("geo", [0]),
+        "Geometry (D_cos, M_bar)": ("geo", [1, 2]),
+        "Entropy + Geometry":      ("geo", [0, 1, 2]),
+        "All 5 geometric":         ("geo", list(range(len(geo_features)))),
+        "All 5 + extended":        ("ext", list(range(len(extended_features)))),
+    }
+
+    rows = []
+    for variant, (fset, idxs) in ablation_sets.items():
+        feat_cols = geo_features if fset == "geo" else extended_features
+        X_all = feat_df[feat_cols].values[:, idxs]
+        feat_names = [feat_cols[i] for i in idxs]
+
+        for name, reg_template in regressors_subset.items():
+            fold_r2, fold_mse = [], []
+
+            for fold_i, (train_idx, val_idx) in enumerate(cv.split(X_all, y_bin)):
+                Xtr, Xva = X_all[train_idx], X_all[val_idx]
+                ytr, yva = y_all[train_idx], y_all[val_idx]
+
+                scaler = StandardScaler().fit(Xtr)
+                Xtr_sc = scaler.transform(Xtr)
+                Xva_sc = scaler.transform(Xva)
+
+                reg = clone(reg_template)
+                reg.fit(Xtr_sc, ytr)
+                preds = reg.predict(Xva_sc)
+
+                fold_r2.append(r2_score(yva, preds))
+                fold_mse.append(mean_squared_error(yva, preds))
+
+            mean_r2 = np.mean(fold_r2)
+            std_r2 = np.std(fold_r2)
+            mean_mse = np.mean(fold_mse)
+            std_mse = np.std(fold_mse)
+
+            rows.append({
+                "Variant": variant,
+                "Model": name,
+                "Mean_CV_R2": mean_r2,
+                "Std_CV_R2": std_r2,
+                "Mean_CV_MSE": mean_mse,
+                "Std_CV_MSE": std_mse,
+                "Features_Used": ", ".join(feat_names),
+            })
+
+            if verbose:
+                print(f"  {variant:30s} | {name:20s} | "
+                      f"R²={mean_r2:.4f}±{std_r2:.4f}  "
+                      f"MSE={mean_mse:.4f}±{std_mse:.4f}")
+
+    return pd.DataFrame(rows)
+
+
 # ==================================================================
 #  8. BOOTSTRAP CONFIDENCE INTERVALS
 # ==================================================================
