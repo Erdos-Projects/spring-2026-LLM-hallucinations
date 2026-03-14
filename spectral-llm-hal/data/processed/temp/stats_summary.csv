@@ -1,0 +1,7 @@
+Dataset,N_questions,Hallu_rate,KS_sig_features,Best_KS_feature,Perm_delta_bits,Perm_pval,Bootstrap_AUC
+defan,500,79.6%,4,M_bar,1.6747,0.0,"0.912 [0.871, 0.946]"
+halueval,500,7.2%,5,sig2_S,1.2933,0.0,"0.876 [0.795, 0.947]"
+mmlu,500,78.4%,4,M_bar,0.3847,0.0,"0.917 [0.870, 0.952]"
+triviaqa,500,41.6%,5,M_bar,2.0118,0.0,"0.971 [0.949, 0.989]"
+truthfulqa,500,72.0%,4,M_bar,1.1194,0.0,"0.929 [0.894, 0.960]"
+combined,2500,55.8%,5,H_sem,1.9928,0.0,"0.947 [0.936, 0.958]"
