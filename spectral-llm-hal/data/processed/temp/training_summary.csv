@@ -1,0 +1,7 @@
+Dataset,Best_Variant,Best_Clf,AUC,Avg_Precision,Brier,F1_at_0.5,Eval_mode
+defan,"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",Logistic Regression,0.8953,0.974,0.1226,0.8846,hold-out test set
+halueval,Entropy + Geometry,XGBoost,0.967,0.6624,0.0464,0.4,hold-out test set
+mmlu,"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",Logistic Regression,0.9545,0.9879,0.0767,0.9325,hold-out test set
+triviaqa,Entropy + Geometry,Random Forest,0.9704,0.943,0.0487,0.9438,hold-out test set
+truthfulqa,Entropy + Geometry,Random Forest,0.9157,0.9719,0.1215,0.8742,hold-out test set
+combined,All 7 geometric,XGBoost,0.9593,0.971,0.0806,0.9065,hold-out test set

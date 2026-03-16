@@ -37,13 +37,16 @@ warnings.filterwarnings("ignore")
 
 LABEL_ORDER   = ["correct", "incorrect", "refused"]
 LABEL_COLORS  = {"correct": "#2196F3", "incorrect": "#E53935", "refused": "#FFA726"}
-GEO_FEATURES  = ["H_sem", "D_cos", "M_bar", "K", "sig2_S"]
+GEO_FEATURES  = ["H_sem", "D_cos", "D_cos_var", "D_pair",
+                  "M_bar", "K", "sig2_S"]
 FEAT_NICE_NAMES = {
-    "H_sem":  "Semantic Entropy",
-    "D_cos":  "Cosine Dispersion",
-    "M_bar":  "Mahalanobis Distance",
-    "K":      "Cluster Count",
-    "sig2_S": "Similarity Variance",
+    "H_sem":    "Semantic Entropy",
+    "D_cos":    "Cosine Dispersion (mean centroid)",
+    "D_cos_var":"Cosine Dispersion (variance centroid)",
+    "D_pair":   "Mean Pairwise Cosine Distance",
+    "M_bar":    "Mahalanobis Distance (mean)",
+    "K":        "Cluster Count",
+    "sig2_S":   "Similarity Variance",
 }
 
 # ── Canonical domain patterns ──────────────────────────────────────────────────

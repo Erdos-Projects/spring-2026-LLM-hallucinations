@@ -1,0 +1,10 @@
+Feature,KS_stat,p_value,sig,Significant
+lam2,0.4297,9.452354176768113e-103,***,True
+lam3,0.4829,6.972001577358376e-131,***,True
+SGR,0.2539,1.951618210931305e-35,***,True
+spectral_entropy,0.3866,9.44614075062676e-83,***,True
+ipr_fiedler,0.132,7.801237530465856e-10,***,True
+HFER,0.4342,5.648685483184563e-105,***,True
+largest_cluster_frac,0.5834,4.922711147876235e-195,***,True
+second_largest_cluster_frac,0.2851,1.1031223678759616e-44,***,True
+singleton_cluster_frac,0.5599,1.1295565364752574e-178,***,True

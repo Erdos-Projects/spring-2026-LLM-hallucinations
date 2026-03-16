@@ -11,8 +11,7 @@ Statistical testing utilities:
     sampled from benchmark sub-categories rather than curated domain strata.
     Splitting already-small per-benchmark samples (≈500 q) by domain produces
     sub-groups too small for reliable inference.  All statistical tests are
-    therefore run at the benchmark level (≈500 q) and at the combined level
-    (2 500 q).
+    therefore run at the benchmark level (≈500 q) and at the combined level.
 
 Statistical test guide (for notebook markdown)
 ------------------------------------------------
@@ -169,7 +168,7 @@ def run_bootstrap_auc(feat_df, geo_features=None, label_col="label",
                        n_estimators=100):
     """
     Bootstrap 95% confidence interval on AUC-ROC for a Random Forest
-    trained on the 5 geometric features.
+    trained on the geometric features.
 
     Only run on full benchmarks or the combined dataset — not per domain.
 

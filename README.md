@@ -77,37 +77,57 @@ spring-2026-llm_hallucinations-project/
 
 ---
 
-## Five Geometric Features
-
-| Symbol | Name | Description |
-|--------|------|-------------|
-| H_sem | Semantic Entropy | Shannon entropy over semantic clusters (τ=0.85) |
-| D_cos | Cosine Dispersion | Mean distance from embeddings to centroid |
-| M_bar | Mahalanobis Distance | Distance from correct-response reference distribution |
-| K | Cluster Count | Number of agglomerative clusters |
-| sig2_S | Similarity Variance | Variance of pairwise cosine similarities |
+## Seven Geometric Features (Baseline Pipeline)
+ 
+| Symbol | Name | Description | Reference |
+|--------|------|-------------|-----------|
+| H_sem | Semantic Entropy | Shannon entropy over semantic clusters (τ=0.85) | Farquhar et al. (2024) |
+| D_cos | Cosine Dispersion (mean centroid) | Mean distance from each embedding to the centroid | Ricco et al. (2025) |
+| D_cos_var | Cosine Dispersion (variance centroid) | Variance of per-response centroid distances; captures asymmetric scatter | - |
+| D_pair | Mean Pairwise Cosine Distance | Mean of (1 − S_jk) across all response pairs; complements D_cos | - |
+| M_bar | Mahalanobis Distance (mean) | Mean distance from the correct-response reference distribution | Lee et al. (2018) |
+| K | Cluster Count | Number of agglomerative clusters | — |
+| sig2_S | Similarity Variance | Variance of pairwise cosine similarities | — |
 
 ---
 
-## Key Design Decisions
+## Spectral Graph Features (`spectral_graph.ipynb`)
 
-### Refusal merge policy
-`refused` responses are treated as hallucinations for binary labelling:
-```
-label = 1  iff  (n_incorrect + n_refused) / n_total > 0.5
-```
-Raw counts are preserved in the feature DataFrame.
+An extended feature set built on the graph Laplacian **L = D − W**, where W is
+the N×N cosine similarity matrix (diagonal zeroed, negatives clipped).
+Eigendecomposition gives 0 = λ₁ ≤ λ₂ ≤ λ₃ ≤ … ≤ λ_N.
+
+### Group A — Laplacian spectrum (6 features)
+
+| Symbol | Description |
+|--------|-------------|
+| lam2 | Fiedler value λ₂ — algebraic connectivity; low = responses nearly disconnect |
+| lam3 | Third eigenvalue λ₃ |
+| SGR | Spectral Gap Ratio λ₂/(λ₃+ε) — clean bipartition signal |
+| spectral_entropy | Shannon entropy over normalised eigenvalue distribution |
+| ipr_fiedler | Inverse Participation Ratio of Fiedler vector v₂ |
+| HFER | λ₂ × Fiedler entropy — combines connectivity with partition geometry |
+
+### Group B — Extended cluster structure (4 features)
+
+| Symbol | Description |
+|--------|-------------|
+| largest_cluster_frac | Fraction of responses in the dominant cluster (p₁) |
+| second_largest_cluster_frac | Fraction in the runner-up cluster (p₂) |
+| singleton_cluster_frac | Fraction of singleton clusters — strong incoherence signal |
+
+---
 
 ### Domain validity
-Domains are LLM-assigned tags (noisy, inconsistent 14–36% of questions).
-All inferential statistics run at **benchmark level** (≈500 q) and **combined level** (2 500 q).
+Domains are LLM-assigned tags (noisy and inconsistent).
+All inferential statistics run at **benchmark level** (≈500 q) and **combined level** (2500 q).
 Domain results are exploratory only, and will not be used for training.
 
 ### Ablation variants (no leakage)
 1. Entropy only (H_sem)
-2. Geometry only (D_cos, M_bar)
+2. Geometry only (D_cos, D_cos_var, M_bar)
 3. Entropy + Geometry
-4. All 5 geometric
+4. All 7 geometric
 
 ## References
 
@@ -116,8 +136,6 @@ Domain results are exploratory only, and will not be used for training.
 - Ricco et al. (2025). Hallucination detection: A probabilistic framework using embedding distance. *arXiv*.
 - Lee et al. (2018). A simple unified framework for detecting OOD samples. *NeurIPS*.
 - Lundberg & Lee (2017). A unified approach to interpreting model predictions. *NeurIPS*.
-
-
 
 ---
 
@@ -134,3 +152,7 @@ Domain results are exploratory only, and will not be used for training.
 
 # 5.  Visualization part I and II:  notebooks/05_visualization, notebooks/05_visualization_partII
 ```
+
+
+
+

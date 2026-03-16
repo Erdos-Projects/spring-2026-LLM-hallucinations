@@ -417,43 +417,52 @@ def plot_roc_curves(X_geo_sc, y_all, geo_features=None,
 
 def plot_ablation_roc_curves(X_geo_sc, y_all, classifiers,
                               ablation_sets, dataset_name="",
-                              random_seed=42, figsize=(11, 8)):
+                              random_seed=42, cols=3):
     """
     ROC curves for each ablation variant × classifier combination.
-    One sub-panel per classifier, all ablation variants overlaid.
+
+    Layout: 2 rows × ceil(n_classifiers / cols) columns.
+    Each sub-panel is one classifier; all ablation variants are overlaid.
+    Mean CV ROC across 5 folds is shown per variant.
     """
+    import copy
     from sklearn.metrics import roc_auc_score, roc_curve
     from sklearn.model_selection import StratifiedKFold
-    import itertools
-
-    n_clf = len(classifiers)
-    fig, axes = plt.subplots(1, n_clf, figsize=figsize, sharey=True)
-    if n_clf == 1:
-        axes = [axes]
+    import math
 
     variant_colors = ["#E53935", "#1E88E5", "#43A047", "#FB8C00"]
     cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_seed)
 
-    for ax, (clf_name, clf) in zip(axes, classifiers.items()):
-        for (variant, (_, feat_idx)), color in zip(ablation_sets.items(), variant_colors):
-            X_sub = X_geo_sc[:, feat_idx]
+    clf_items = list(classifiers.items())
+    n_clf  = len(clf_items)
+    n_cols = min(cols, n_clf)
+    n_rows = math.ceil(n_clf / n_cols)
+    fig, axes = plt.subplots(n_rows, n_cols,
+                             figsize=(5.5 * n_cols, 5 * n_rows),
+                             sharey=True)
+    # flatten to 1-D regardless of shape
+    axes_flat = np.array(axes).flatten()
+
+    for ax_i, (clf_name, clf) in enumerate(clf_items):
+        ax = axes_flat[ax_i]
+        for (variant, (_, feat_idx)), color in zip(ablation_sets.items(),
+                                                    variant_colors):
+            X_sub    = X_geo_sc[:, feat_idx]
             tprs, aucs = [], []
             mean_fpr = np.linspace(0, 1, 100)
             for train_idx, test_idx in cv.split(X_sub, y_all):
                 if len(np.unique(y_all[train_idx])) < 2:
                     continue
-                import copy
                 clf_c = copy.deepcopy(clf)
                 clf_c.fit(X_sub[train_idx], y_all[train_idx])
-                fpr, tpr, _ = roc_curve(y_all[test_idx],
-                                         clf_c.predict_proba(X_sub[test_idx])[:, 1])
+                prob  = clf_c.predict_proba(X_sub[test_idx])[:, 1]
+                fpr, tpr, _ = roc_curve(y_all[test_idx], prob)
                 tprs.append(np.interp(mean_fpr, fpr, tpr))
-                aucs.append(roc_auc_score(y_all[test_idx],
-                                           clf_c.predict_proba(X_sub[test_idx])[:, 1]))
+                aucs.append(roc_auc_score(y_all[test_idx], prob))
             if not tprs:
                 continue
-            mean_tpr = np.mean(tprs, axis=0)
-            ax.plot(mean_fpr, mean_tpr, color=color, linewidth=2,
+            ax.plot(mean_fpr, np.mean(tprs, axis=0), color=color,
+                    linewidth=2,
                     label=f"{variant}  (AUC={np.mean(aucs):.3f})")
 
         ax.plot([0, 1], [0, 1], "k--", alpha=0.3)
@@ -461,6 +470,10 @@ def plot_ablation_roc_curves(X_geo_sc, y_all, classifiers,
         ax.set_ylabel("True Positive Rate")
         ax.set_title(clf_name, fontweight="bold")
         ax.legend(fontsize=7, loc="lower right")
+
+    # hide any unused axes (if n_clf is not a multiple of n_cols)
+    for ax_i in range(n_clf, len(axes_flat)):
+        axes_flat[ax_i].axis("off")
 
     ttl = f"{dataset_name}: Ablation ROC Curves" if dataset_name else "Ablation ROC Curves"
     plt.suptitle(ttl, fontweight="bold", y=1.01)
@@ -512,5 +525,187 @@ def plot_shap_beeswarm(X_sc, y, geo_features=None, title="SHAP Beeswarm",
     shap.summary_plot(sv, X_sc, feature_names=geo_features,
                       show=False, plot_size=None)
     plt.title(title, fontweight="bold")
+    plt.tight_layout()
+    return fig
+
+
+# ── Evaluation plots (AJ-inspired additions) ──────────────────────────────────
+
+def plot_precision_recall_curve(pr_curve_df, dataset_name="", figsize=(5, 5)):
+    """
+    Precision-Recall curve from results_bundle['pr_curve_df'].
+
+    More informative than ROC when classes are imbalanced:
+    - x-axis = Recall (True Positive Rate)
+    - y-axis = Precision (positive predictive value)
+    - A random/no-skill classifier sits at a horizontal line equal to the
+      positive class fraction in the test set.
+    - Larger area under PR curve = better hallucination detection at low FP cost.
+
+    Adapted from AJ.
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(pr_curve_df["recall"], pr_curve_df["precision"],
+            color="steelblue", linewidth=2)
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
+    ttl = (f"{dataset_name}: Precision-Recall Curve"
+           if dataset_name else "Precision-Recall Curve")
+    ax.set_title(ttl, fontweight="bold")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.05)
+    plt.tight_layout()
+    return fig
+
+
+def plot_calibration_curve(test_pred_df, dataset_name="",
+                            n_bins=10, figsize=(5.5, 5.5)):
+    """
+    Calibration curve: are predicted probabilities trustworthy as risk scores?
+
+    - Diagonal = perfect calibration (predicted p == observed positive rate).
+    - Below diagonal → model is over-confident.
+    - Above diagonal → model is under-confident.
+    - Well-calibrated models are useful as risk scores, not just rankings.
+
+    Adapted from AJ.
+    """
+    from sklearn.calibration import calibration_curve as _cal_curve
+
+    prob_true, prob_pred = _cal_curve(
+        test_pred_df["y_true"], test_pred_df["y_prob"],
+        n_bins=n_bins, strategy="uniform")
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(prob_pred, prob_true, marker="o", color="steelblue", label="Model")
+    ax.plot([0, 1], [0, 1], "--", color="gray", label="Perfect calibration")
+    ax.set_xlabel("Mean predicted probability")
+    ax.set_ylabel("Observed fraction of positives")
+    ttl = (f"{dataset_name}: Calibration Curve"
+           if dataset_name else "Calibration Curve")
+    ax.set_title(ttl, fontweight="bold")
+    ax.legend(loc="upper left")
+    plt.tight_layout()
+    return fig
+
+
+def plot_threshold_diagnostics(threshold_df, dataset_name="", figsize=(8, 4.5)):
+    """
+    Precision, recall, F1, specificity as a function of decision threshold.
+
+    Interpretation:
+    - Raise threshold → higher precision, lower recall (fewer false alarms,
+      but more missed hallucinations).
+    - Lower threshold → higher recall, lower precision (catches more, but
+      more false alarms).
+    - F1 balances both; choose threshold near the F1 peak for balanced usage.
+    - Specificity = fraction of correct questions correctly passed through.
+
+    Adapted from AJ.
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(threshold_df["threshold"], threshold_df["precision"],
+            marker="o", label="Precision")
+    ax.plot(threshold_df["threshold"], threshold_df["recall"],
+            marker="o", label="Recall")
+    ax.plot(threshold_df["threshold"], threshold_df["f1"],
+            marker="o", label="F1")
+    ax.plot(threshold_df["threshold"], threshold_df["specificity"],
+            marker="o", label="Specificity")
+    ax.set_xlabel("Decision threshold")
+    ax.set_ylabel("Metric value")
+    ttl = (f"{dataset_name}: Threshold Diagnostics"
+           if dataset_name else "Threshold Diagnostics")
+    ax.set_title(ttl, fontweight="bold")
+    ax.legend(fontsize=9)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.05)
+    plt.tight_layout()
+    return fig
+
+
+def plot_predicted_prob_hist(test_pred_df, dataset_name="", figsize=(6, 4)):
+    """
+    Predicted probability distribution by true class label.
+
+    A well-discriminating model separates the two distributions:
+    - Correct (y=0) should cluster near 0.
+    - Hallucinated (y=1) should cluster near 1.
+    Overlap near 0.5 marks the hard/uncertain cases.
+
+    Adapted from AJ.
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    for lv, color, lab in [(0, "steelblue", "Correct"),
+                            (1, "tomato", "Hallucinated")]:
+        sub = test_pred_df[test_pred_df["y_true"] == lv]["y_prob"]
+        ax.hist(sub, bins=30, density=True, alpha=0.6, color=color,
+                label=lab, edgecolor="white")
+    ax.set_xlabel("Predicted probability of hallucination")
+    ax.set_ylabel("Density")
+    ttl = (f"{dataset_name}: Predicted Probability Distribution"
+           if dataset_name else "Predicted Probability Distribution")
+    ax.set_title(ttl, fontweight="bold")
+    ax.legend(fontsize=9)
+    plt.tight_layout()
+    return fig
+
+
+def plot_confusion_matrices(test_pred_df, thresholds=(0.3, 0.5, 0.7),
+                             dataset_name="", figsize=None):
+    """
+    Side-by-side confusion matrices at multiple decision thresholds.
+    Adapted from AJ.
+    """
+    from sklearn.metrics import confusion_matrix as _cm
+
+    figsize = figsize or (4 * len(thresholds), 4)
+    fig, axes = plt.subplots(1, len(thresholds), figsize=figsize)
+    if len(thresholds) == 1:
+        axes = [axes]
+
+    for ax, thr in zip(axes, thresholds):
+        yp = (test_pred_df["y_prob"] >= thr).astype(int)
+        cm = _cm(test_pred_df["y_true"], yp)
+        ax.imshow(cm, cmap="Blues")
+        ax.set_title(f"threshold = {thr}", fontweight="bold")
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("True")
+        ax.set_xticks([0, 1])
+        ax.set_yticks([0, 1])
+        ax.set_xticklabels(["Correct", "Hallu"])
+        ax.set_yticklabels(["Correct", "Hallu"])
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                ax.text(j, i, cm[i, j], ha="center", va="center",
+                        fontsize=13, fontweight="bold",
+                        color="white" if cm[i, j] > cm.max() / 2 else "black")
+    ttl = (f"{dataset_name}: Confusion Matrices"
+           if dataset_name else "Confusion Matrices")
+    plt.suptitle(ttl, fontweight="bold")
+    plt.tight_layout()
+    return fig
+
+
+def plot_logit_coefficients(coef_df, dataset_name="",
+                             top_n=15, figsize=(6, 5)):
+    """
+    Top logistic regression / elastic-net coefficients.
+
+    - Positive coefficient → feature pushes prediction toward hallucinated.
+    - Negative coefficient → feature pushes prediction toward correct.
+    - Features with coefficient near zero were shrunk by L1 (elastic-net).
+
+    Adapted from AJ.
+    """
+    top = coef_df.head(top_n)
+    fig, ax = plt.subplots(figsize=figsize)
+    colors = ["tomato" if v > 0 else "steelblue" for v in top["coefficient"]]
+    ax.barh(top["feature"], top["coefficient"], color=colors)
+    ax.axvline(0, color="black", linewidth=1)
+    ttl = (f"{dataset_name}: Top Feature Coefficients"
+           if dataset_name else "Top Feature Coefficients")
+    ax.set_title(ttl, fontweight="bold")
+    ax.set_xlabel("Coefficient value")
     plt.tight_layout()
     return fig
