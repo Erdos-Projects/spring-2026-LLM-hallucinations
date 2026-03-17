@@ -8,3 +8,12 @@ tqdm
 pandas
 matplotlib
 seaborn
+sentence-transformers>=2.2
+scikit-learn>=1.2
+scipy>=1.10
+pandas>=1.5
+numpy>=1.23
+matplotlib>=3.6
+seaborn>=0.12
+xgboost>=1.7
+shap>=0.42

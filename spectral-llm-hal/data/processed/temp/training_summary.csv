@@ -1,0 +1,7 @@
+Dataset,Best_Variant,Best_Clf,AUC,Avg_Precision,Brier,F1_at_0.5,Eval_mode
+defan,"Geometry only (D_cos, D_cos_var, D_pair)",Logistic Regression,0.8231,0.9532,0.1339,0.8642,hold-out
+halueval,All 6 geometric,Random Forest,0.9478,0.6627,0.0444,0.25,hold-out
+mmlu,"Geometry only (D_cos, D_cos_var, D_pair)",ElasticNet Logit,0.7185,0.8987,0.1559,0.8621,hold-out
+triviaqa,Entropy only (H_sem),Logistic Regression,0.9218,0.9081,0.1067,0.8101,hold-out
+truthfulqa,"Geometry only (D_cos, D_cos_var, D_pair)",Gradient Boosting,0.6939,0.864,0.1875,0.8242,hold-out
+combined,All 6 geometric,ElasticNet Logit,0.9059,0.9295,0.1269,0.8427,hold-out

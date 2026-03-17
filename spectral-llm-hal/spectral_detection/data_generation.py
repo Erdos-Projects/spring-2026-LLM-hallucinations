@@ -399,7 +399,7 @@ class LLMJudge:
         if new_changes_count > 0:
             self._atomic_save(records, target_jsonl_path)\
                 
-
+# This was included for accelerating inference of the judge.
 class AsyncLLMJudge:
     def __init__(self, api_key: str):
         """

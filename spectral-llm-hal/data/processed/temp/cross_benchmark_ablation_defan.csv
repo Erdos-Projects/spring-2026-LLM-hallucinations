@@ -1,0 +1,41 @@
+Variant,Classifier,Test_AUC
+Entropy only (H_sem),Logistic Regression,0.8706
+Entropy only (H_sem),ElasticNet Logit,0.8706
+Entropy only (H_sem),Random Forest,0.8667
+Entropy only (H_sem),Gradient Boosting,0.8672
+Entropy only (H_sem),XGBoost,0.8556
+"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",Logistic Regression,0.8601
+"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",ElasticNet Logit,0.8604
+"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",Random Forest,0.8202
+"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",Gradient Boosting,0.797
+"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",XGBoost,0.7847
+Entropy + Geometry,Logistic Regression,0.8466
+Entropy + Geometry,ElasticNet Logit,0.8462
+Entropy + Geometry,Random Forest,0.8242
+Entropy + Geometry,Gradient Boosting,0.7908
+Entropy + Geometry,XGBoost,0.8012
+All 7 geometric,Logistic Regression,0.8442
+All 7 geometric,ElasticNet Logit,0.8444
+All 7 geometric,Random Forest,0.8273
+All 7 geometric,Gradient Boosting,0.7946
+All 7 geometric,XGBoost,0.7934
+Geometry with M_bar,Logistic Regression,0.8601
+Geometry with M_bar,ElasticNet Logit,0.8604
+Geometry with M_bar,Random Forest,0.8202
+Geometry with M_bar,Gradient Boosting,0.797
+Geometry with M_bar,XGBoost,0.7847
+Geometry without M_bar,Logistic Regression,0.8644
+Geometry without M_bar,ElasticNet Logit,0.8645
+Geometry without M_bar,Random Forest,0.8555
+Geometry without M_bar,Gradient Boosting,0.851
+Geometry without M_bar,XGBoost,0.8363
+All 7 (with M_bar),Logistic Regression,0.8442
+All 7 (with M_bar),ElasticNet Logit,0.8444
+All 7 (with M_bar),Random Forest,0.8273
+All 7 (with M_bar),Gradient Boosting,0.7946
+All 7 (with M_bar),XGBoost,0.7934
+All 6 (without M_bar),Logistic Regression,0.8712
+All 6 (without M_bar),ElasticNet Logit,0.8714
+All 6 (without M_bar),Random Forest,0.8615
+All 6 (without M_bar),Gradient Boosting,0.8604
+All 6 (without M_bar),XGBoost,0.8429
