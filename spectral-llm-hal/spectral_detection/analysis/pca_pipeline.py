@@ -29,7 +29,11 @@ class pipeline:
     L: int          # number of layers
     H: int          # number of attention heads
     K: int = 10     # eigenvalues per head
+<<<<<<< HEAD
     # pca_variance: int = 256   # number of PCA components to retain (or variance threshold if float)
+=======
+    pca_variance: float = 0.95
+>>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
 
     scaler: Optional[StandardScaler] = None
     pca: Optional[PCA] = None
@@ -38,12 +42,21 @@ class pipeline:
     # Helpers
     # ---------------------------------------------------
 
+<<<<<<< HEAD
     # @staticmethod
     # def signed_log1p(x: np.ndarray) -> np.ndarray:
     #     """
     #     Stable log transform preserving sign.
     #     """
     #     return np.sign(x) * np.log1p(np.abs(x))
+=======
+    @staticmethod
+    def signed_log1p(x: np.ndarray) -> np.ndarray:
+        """
+        Stable log transform preserving sign.
+        """
+        return np.sign(x) * np.log1p(np.abs(x))
+>>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
 
     # We will skip head averaging for now since it doesn't seem to help and we want to preserve more information. 
     # But we can always add it back in later if needed.
@@ -127,7 +140,11 @@ class pipeline:
     # PCA pipeline
     # ---------------------------------------------------
 
+<<<<<<< HEAD
     def fit_transform(self, X: np.ndarray, pca_variance: int) -> np.ndarray:
+=======
+    def fit_transform(self, X: np.ndarray) -> np.ndarray:
+>>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
         """
         Standardize + PCA
         """
@@ -135,7 +152,11 @@ class pipeline:
         self.scaler = StandardScaler()
         X_scaled = self.scaler.fit_transform(X)
 
+<<<<<<< HEAD
         self.pca = PCA(n_components=pca_variance)
+=======
+        self.pca = PCA(n_components=self.pca_variance)
+>>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
         X_pca = self.pca.fit_transform(X_scaled)
 
         return X_pca
