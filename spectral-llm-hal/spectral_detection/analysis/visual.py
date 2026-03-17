@@ -64,6 +64,11 @@ import json
 from scipy.stats import mannwhitneyu
 
 
+RANDOM_STATE = 33
+TEST_SIZE = 0.2
+N_BOOTSTRAP_ROC = 200
+
+
 def load_dataframe(path: str) -> pd.DataFrame:
     """
     Load dataframe from parquet/csv/pkl.
@@ -151,23 +156,20 @@ def cohens_d(x0: np.ndarray, x1: np.ndarray) -> float:
     return (np.mean(x1) - np.mean(x0)) / sp
 
 
-def make_probe_pipeline(pca_dim: int) -> Pipeline:
-    """
-    Standard pipeline:
-        impute -> scale -> PCA -> logistic regression
-    """
+def make_probe_pipeline(pca_dim: int, random_state: int = 33) -> Pipeline:
     return Pipeline([
         ("imputer", SimpleImputer(strategy="median")),
         ("scaler", StandardScaler()),
-        ("pca", PCA(n_components=pca_dim, random_state=RANDOM_STATE)),
+        ("pca", PCA(n_components=pca_dim, random_state=random_state)),
         ("clf", LogisticRegression(
             penalty="l2",
             max_iter=5000,
             class_weight="balanced",
-            random_state=RANDOM_STATE,
+            random_state=random_state,
             solver="lbfgs"
         )),
     ])
+
 
 
 def fit_predict_scores(
@@ -300,6 +302,7 @@ def plot_v1_kde_by_rank(
     fig.suptitle("V1 — Eigenvalue Distribution by Label (pooled over datasets, layers, heads)", y=0.995)
     fig.tight_layout(rect=[0, 0, 1, 0.99])
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
 
     stats_df = pd.DataFrame(stats_rows)
@@ -420,16 +423,16 @@ def plot_v2_heatmap(
     )
 
     # Overlay black contour at p = 0.05
-    p_numeric = pval_df.astype(float).values
-    X, Y = np.meshgrid(np.arange(n_heads) + 0.5, np.arange(n_layers) + 0.5)
-    ax.contour(
-        X,
-        Y,
-        p_numeric,
-        levels=[0.05],
-        colors="black",
-        linewidths=1.5,
-    )
+    # p_numeric = pval_df.astype(float).values
+    # X, Y = np.meshgrid(np.arange(n_heads) + 0.5, np.arange(n_layers) + 0.5)
+    # ax.contour(
+    #     X,
+    #     Y,
+    #     p_numeric,
+    #     levels=[0.05],
+    #     colors="black",
+    #     linewidths=1.5,
+    # )
 
     ax.set_title(
         f"V2 — Mann–Whitney p-value heatmap{title_suffix}\n"
@@ -440,6 +443,7 @@ def plot_v2_heatmap(
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
 
     pval_df.to_csv(output_path.with_suffix(".csv"))
@@ -527,6 +531,7 @@ def plot_v3_layerwise_auroc(
     top_k: int,
     full_pca_dim: int,
     layer_pca_dim: int,
+    test_size: float,
     output_path: Path,
 ) -> pd.DataFrame:
     """
@@ -558,12 +563,12 @@ def plot_v3_layerwise_auroc(
 
         X_train, X_test, y_train, y_test = train_test_split(
             X_full, y,
-            test_size=TEST_SIZE,
-            random_state=RANDOM_STATE,
+            test_size=test_size,
+            random_state=33,
             stratify=y
         )
+        all_layer_model = make_probe_pipeline(min(full_pca_dim, X_train.shape[1], len(X_train)), random_state=33)
 
-        all_layer_model = make_probe_pipeline(min(full_pca_dim, X_train.shape[1], len(X_train)))
         y_score_full = fit_predict_scores(X_train, y_train, X_test, all_layer_model)
         auc_full = roc_auc_score(y_test, y_score_full)
 
@@ -578,8 +583,8 @@ def plot_v3_layerwise_auroc(
             X_layer = sub[layer_cols]
             Xl_train, Xl_test, yl_train, yl_test = train_test_split(
                 X_layer, y,
-                test_size=TEST_SIZE,
-                random_state=RANDOM_STATE,
+                test_size=test_size,
+                random_state=33,
                 stratify=y
             )
 
@@ -587,7 +592,7 @@ def plot_v3_layerwise_auroc(
             if layer_dim < 1:
                 continue
 
-            layer_model = make_probe_pipeline(layer_dim)
+            layer_model = make_probe_pipeline(layer_dim, random_state=33)
             y_score_layer = fit_predict_scores(Xl_train, yl_train, Xl_test, layer_model)
             auc_layer = roc_auc_score(yl_test, y_score_layer)
 
@@ -611,6 +616,7 @@ def plot_v3_layerwise_auroc(
     ax.legend(fontsize=8, ncol=2)
     fig.tight_layout()
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
 
     res_df = pd.DataFrame(results)
@@ -734,6 +740,7 @@ def plot_v4_roc_comparison(
     fig.suptitle("V4 — ROC Curve Comparison Across Datasets", y=0.995)
     fig.tight_layout(rect=[0, 0, 1, 0.98])
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
 
     summary_df = pd.DataFrame(summary_rows)
@@ -833,6 +840,7 @@ def plot_v5_cross_generalisation(
 
     fig.tight_layout()
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
 
     lapeig_mat.to_csv(output_path.with_suffix(".csv"))
@@ -1098,6 +1106,7 @@ def plot_bootstrap_distribution(
     ax.legend()
     fig.tight_layout()
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
 
 
