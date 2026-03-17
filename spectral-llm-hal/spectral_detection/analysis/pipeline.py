@@ -5,10 +5,123 @@ from dataclasses import dataclass
 from typing import Any, Dict, Tuple, List, Optional
 
 import numpy as np
+import pandas as pd
 import torch
+import json
+
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+
+
+# def build_training_dataset_eigen_only(jsonl_path: str, pt_path: str):
+
+#     with open(jsonl_path, "r") as f:
+#         df_meta = pd.DataFrame([json.loads(line) for line in f])
+
+#     pt_payload = torch.load(pt_path, map_location="cpu", weights_only=True)
+#     feature_dict = pt_payload.get("data", pt_payload)
+
+#     # Extract the eigenvalue arrays
+#     feature_rows = []
+#     for record_id, payload in list(feature_dict.items()):
+#         eig_array = payload.numpy().astype(np.float32)
+
+#         feature_rows.append({"id": record_id, "features": eig_array})
+
+#     df_features = pd.DataFrame(feature_rows)
+
+#     # Inner join to guarantee perfect alignment between features and labels
+#     df_final = pd.merge(df_meta, df_features, on="id", how="inner")
+
+#     # Filter errors and construct the binary label vector
+#     df_final = df_final[df_final["correctness"] != "error"]
+#     df_final["label"] = df_final["correctness"].apply(lambda x: 1 if x.lower() == "correct" else 0)
+
+#     # Formulate the X and y matrices
+#     X = np.vstack(df_final["features"].values)
+#     y = df_final["label"].values
+
+#     print(f"Feature Matrix (X) shape: {X.shape}")
+#     print(f"Label Vector (y) shape: {y.shape}")
+
+#     return df_final, X, y
+
+def build_training_dataset_eigen_only(jsonl_path: str, pt_path: str):
+
+    with open(jsonl_path, "r") as f:
+        df_meta = pd.DataFrame([json.loads(line) for line in f])
+
+    pt_payload = torch.load(pt_path, map_location="cpu", weights_only=True)
+    feature_dict = pt_payload.get("data", pt_payload)
+
+    # Extract the eigenvalue arrays
+    feature_rows = []
+    for record_id, payload in list(feature_dict.items()):
+        eig_array = payload['laplacian'].numpy().astype(np.float32)
+
+        feature_rows.append({"id": record_id, "features": eig_array})
+
+    df_features = pd.DataFrame(feature_rows)
+
+    # Inner join to guarantee perfect alignment between features and labels
+    df_final = pd.merge(df_meta, df_features, on="id", how="inner")
+
+    # Filter errors and construct the binary label vector
+    df_final = df_final[df_final["correctness"] != "error"]
+    df_final["label"] = df_final["correctness"].apply(lambda x: 1 if x.lower() == "incorrect" else 0)
+
+    # Formulate the X and y matrices
+    X = np.vstack(df_final["features"].values)
+    y = df_final["label"].values
+
+    print(f"Feature Matrix (X) shape: {X.shape}")
+    print(f"Label Vector (y) shape: {y.shape}")
+
+    return df_final, X, y
+
+def build_training_dataset_eigen_attn(jsonl_path: str, pt_path: str):
+
+    with open(jsonl_path, "r") as f:
+        df_meta = pd.DataFrame([json.loads(line) for line in f])
+
+    pt_payload = torch.load(pt_path, map_location="cpu", weights_only=True)
+    feature_dict = pt_payload.get("data", pt_payload)
+
+    # Extract the eigenvalue arrays
+    feature_rows = []
+    for record_id, payload in list(feature_dict.items()):
+        eig_array = payload['laplacian'].numpy().astype(np.float32)
+
+        feature_rows.append({"id": record_id, "features": eig_array})
+
+    df_features = pd.DataFrame(feature_rows)
+
+    attn_rows = []
+    for record_id, payload in list(feature_dict.items()):
+        attn_array = payload['attention_score'].numpy().astype(np.float32)
+
+        attn_rows.append({"id": record_id, "attention_score": attn_array})
+
+    df_attn = pd.DataFrame(attn_rows)
+
+    # Inner join to guarantee perfect alignment between features and labels
+    df_final = pd.merge(df_meta, df_features, on="id", how="inner")
+    df_final = pd.merge(df_final, df_attn, on="id", how="inner")
+
+    # Filter errors and construct the binary label vector
+    df_final = df_final[df_final["correctness"] != "error"]
+    df_final["label"] = df_final["correctness"].apply(lambda x: 1 if x.lower() == "incorrect" else 0)
+
+    # Formulate the X and y matrices
+    X = np.vstack(df_final["features"].values)
+    y = df_final["label"].values
+
+    print(f"Feature Matrix (X) shape: {X.shape}")
+    print(f"Label Vector (y) shape: {y.shape}")
+
+    return df_final, X, y
+
 
 
 @dataclass
@@ -29,11 +142,6 @@ class pipeline:
     L: int          # number of layers
     H: int          # number of attention heads
     K: int = 10     # eigenvalues per head
-<<<<<<< HEAD
-    # pca_variance: int = 256   # number of PCA components to retain (or variance threshold if float)
-=======
-    pca_variance: float = 0.95
->>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
 
     scaler: Optional[StandardScaler] = None
     pca: Optional[PCA] = None
@@ -42,21 +150,12 @@ class pipeline:
     # Helpers
     # ---------------------------------------------------
 
-<<<<<<< HEAD
     # @staticmethod
     # def signed_log1p(x: np.ndarray) -> np.ndarray:
     #     """
     #     Stable log transform preserving sign.
     #     """
     #     return np.sign(x) * np.log1p(np.abs(x))
-=======
-    @staticmethod
-    def signed_log1p(x: np.ndarray) -> np.ndarray:
-        """
-        Stable log transform preserving sign.
-        """
-        return np.sign(x) * np.log1p(np.abs(x))
->>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
 
     # We will skip head averaging for now since it doesn't seem to help and we want to preserve more information. 
     # But we can always add it back in later if needed.
@@ -140,11 +239,7 @@ class pipeline:
     # PCA pipeline
     # ---------------------------------------------------
 
-<<<<<<< HEAD
     def fit_transform(self, X: np.ndarray, pca_variance: int) -> np.ndarray:
-=======
-    def fit_transform(self, X: np.ndarray) -> np.ndarray:
->>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
         """
         Standardize + PCA
         """
@@ -152,11 +247,7 @@ class pipeline:
         self.scaler = StandardScaler()
         X_scaled = self.scaler.fit_transform(X)
 
-<<<<<<< HEAD
         self.pca = PCA(n_components=pca_variance)
-=======
-        self.pca = PCA(n_components=self.pca_variance)
->>>>>>> 25a67ec7e6757ba41dabd3ca79ef7aaf6377756f
         X_pca = self.pca.fit_transform(X_scaled)
 
         return X_pca
@@ -170,3 +261,4 @@ class pipeline:
 
         X_scaled = self.scaler.transform(X)
         return self.pca.transform(X_scaled)
+
