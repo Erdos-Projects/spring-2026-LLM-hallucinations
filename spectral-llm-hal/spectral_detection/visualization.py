@@ -17,7 +17,7 @@ PLOTS INCLUDED:
   - ROC curves (per-feature + combined)
   - Ablation grouped bar chart
   - Per-domain classification heatmap
-  - SHAP beeswarm (per benchmark + combined — NOT per domain)
+  - SHAP beeswarm (per benchmark + combined, not per domain)
 
 PLOTS EXCLUDED (by project specification):
   - Per-domain feature KDE grids
@@ -55,7 +55,7 @@ def plot_response_label_breakdown(df, label_order=None, label_colors=None,
     """
     Stacked horizontal bar charts of response-level proportions by domain
     (and optionally by answer type, for DefAn only).
-    Method from hallucination_utils.py.
+
     """
     label_order = label_order or LABEL_ORDER
     colors = label_colors or LABEL_COLORS
@@ -120,7 +120,7 @@ def plot_label_proportion_heatmap(df, label_order=None, domain_col="domain",
                                    figsize=(9, 6),
                                    title="Response Label Proportions by Domain"):
     """Annotated heatmap of response-level label proportions per domain.
-    Method from hallucination_utils.py."""
+"""
     label_order = label_order or LABEL_ORDER
     ct = pd.crosstab(df[domain_col], df[correctness_col])
     ct = ct.reindex(columns=[c for c in label_order if c in ct.columns])
@@ -142,7 +142,7 @@ def plot_question_label_profiles(feat_df, frac_cols, frac_nice_names,
                                   figsize=(12, 6),
                                   title="Average Response Label Profile by Domain"):
     """Stacked horizontal bar of mean label fractions per domain.
-    Method from hallucination_utils.py."""
+"""
     domain_fracs = (
         feat_df.groupby(domain_col)[frac_cols].mean()
         .sort_values(frac_cols[1], ascending=False)
@@ -171,7 +171,7 @@ def plot_hallucination_rate_by_domain(feat_df, domain_stats,
                                        figsize=(16, 6)):
     """
     Bar + violin of hallucination rate per domain.
-    Method from hallucination_utils.py.
+
     """
     ds = domain_stats.reset_index()
     y_labels = [
@@ -183,7 +183,7 @@ def plot_hallucination_rate_by_domain(feat_df, domain_stats,
     fig, axes = plt.subplots(1, 2, figsize=figsize)
     axes[0].barh(y_labels, ds["hall_rate_mean"] * 100,
                  xerr=ds["hall_rate_std"] * 100, color=colors, capsize=4)
-    axes[0].set_xlabel("Mean Hallucination Rate (%) — refusals counted as hallucinations")
+    axes[0].set_xlabel("Mean Hallucination Rate (%) (note: refusals counted as hallucinations)")
     axes[0].set_title("Hallucination Rate by Domain", fontweight="bold")
     axes[0].axvline(50, color="gray", linestyle="--", alpha=0.5)
 
@@ -206,7 +206,7 @@ def plot_feature_distributions(feat_df, geo_features=None, feat_nice=None,
                                 suptitle="Geometric Feature Distributions"):
     """
     KDE + histogram for each geometric feature, split by binary label.
-    Method from hallucination_utils.py.
+
     """
     geo_features = geo_features or GEO_FEATURES
     feat_nice    = feat_nice or FEAT_NICE_NAMES
@@ -241,7 +241,7 @@ def plot_feature_distributions(feat_df, geo_features=None, feat_nice=None,
 def plot_correlation_matrix(feat_df, cols=None, figsize=(10, 8),
                              title="Correlation Matrix"):
     """Lower-triangle Pearson correlation heatmap.
-    Method from hallucination_utils.py."""
+"""
     cols = cols or GEO_FEATURES
     corr = feat_df[cols].corr()
     mask = np.triu(np.ones_like(corr, dtype=bool), k=1)
@@ -257,7 +257,7 @@ def plot_entropy_vs_dispersion(feat_df, label_col="label",
                                 figsize=(9, 7),
                                 title="Entropy vs Dispersion"):
     """Scatter of H_sem vs D_cos coloured by binary label.
-    Method from hallucination_utils.py."""
+"""
     fig, ax = plt.subplots(figsize=figsize)
     c = feat_df[label_col].map({0: "steelblue", 1: "tomato"})
     ax.scatter(feat_df["H_sem"], feat_df["D_cos"], c=c,
@@ -279,7 +279,7 @@ def plot_feature_pairplot(feat_df, geo_features=None, label_col="label",
                            label_names=None, max_points=1500,
                            random_seed=42, suptitle="Feature Pairplot"):
     """Seaborn pairplot with KDE diagonals.  Downsamples for speed.
-    Method from hallucination_utils.py."""
+"""
     geo_features = geo_features or GEO_FEATURES
     label_names  = label_names or {0: "Correct", 1: "Hallucinated"}
 
@@ -307,7 +307,7 @@ def plot_permutation_test(perm_deltas, delta_obs, n_permutations, perm_pval,
                            figsize=(9, 5),
                            title="Permutation Test: Semantic Entropy"):
     """Histogram of null distribution with observed delta.
-    Method from hallucination_utils.py."""
+"""
     fig, ax = plt.subplots(figsize=figsize)
     ax.hist(perm_deltas, bins=60, color="gray", alpha=0.7, density=True,
             label="Null distribution")
@@ -346,7 +346,7 @@ def plot_bootstrap_auc(auc_boot, ci_lo, ci_hi, dataset_name="",
 def plot_ablation_bar(df_clf, dataset_name="", figsize_aspect=2.5):
     """
     Grouped bar chart: AUC across feature subsets × classifiers.
-    Method from hallucination_utils.py.
+
     """
     g = sns.catplot(
         data=df_clf, kind="bar",
@@ -356,7 +356,7 @@ def plot_ablation_bar(df_clf, dataset_name="", figsize_aspect=2.5):
     )
     g.ax.axhline(0.5, color="gray", linestyle="--", alpha=0.5)
     g.ax.set_ylim(0.4, 1.0)
-    ttl = f"{dataset_name}: Ablation — Feature Subsets × Classifier" if dataset_name else "Ablation — Feature Subsets × Classifier"
+    ttl = f"{dataset_name} Ablation (Feature Subsets × Classifier)" if dataset_name else "Ablation (Feature Subsets × Classifier)"
     g.ax.set_title(ttl, fontweight="bold")
     g.ax.set_ylabel("AUC-ROC (5-fold CV)")
     g.ax.set_xlabel("")
@@ -369,7 +369,7 @@ def plot_roc_curves(X_geo_sc, y_all, geo_features=None,
                     dataset_name="", random_seed=42, figsize=(9, 7)):
     """
     ROC curves for each individual feature plus the combined RF model.
-    Method from hallucination_utils.py.
+
 
     How to interpret ROC curves
     ----------------------------
@@ -386,7 +386,7 @@ def plot_roc_curves(X_geo_sc, y_all, geo_features=None,
     from sklearn.metrics import roc_auc_score, roc_curve
 
     geo_features = geo_features or GEO_FEATURES
-    feat_colors = ["#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA"]
+    feat_colors = ["#E53935", "#1E88E5", "#43A047", "#FB8C00", "#8E24AA", "#2009F1"]
 
     fig, ax = plt.subplots(figsize=figsize)
 
@@ -403,12 +403,12 @@ def plot_roc_curves(X_geo_sc, y_all, geo_features=None,
     fpr_a, tpr_a, _ = roc_curve(y_all, y_scores)
     auc_a = roc_auc_score(y_all, y_scores)
     ax.plot(fpr_a, tpr_a, color="black", linewidth=2.5,
-            label=f"All 5 — RF (AUC={auc_a:.3f})")
+            label=f"All 6: RF (AUC={auc_a:.3f})")
 
     ax.plot([0, 1], [0, 1], "k--", alpha=0.3)
     ax.set_xlabel("False Positive Rate")
     ax.set_ylabel("True Positive Rate")
-    ttl = f"{dataset_name}: ROC — Individual Features vs Combined" if dataset_name else "ROC — Individual Features vs Combined"
+    ttl = f"{dataset_name} ROC (Individual Features vs Combined)" if dataset_name else "ROC (Individual Features vs Combined)"
     ax.set_title(ttl, fontweight="bold")
     ax.legend(fontsize=9, loc="lower right")
     plt.tight_layout()

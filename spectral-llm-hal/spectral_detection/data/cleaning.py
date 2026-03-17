@@ -1,27 +1,16 @@
 """
 spectral_detection/data/cleaning.py
 
-Data loading, preprocessing, and domain-consolidation utilities.
+Data loading, preprocessing, and domain consolidation for five QA benchmarks:
+DefAn, HaluEval, MMLU, TriviaQA, TruthfulQA.
 
-Supports all five datasets: DefAn, HaluEval, MMLU, TriviaQA, TruthfulQA.
+All datasets share: id, question, reference_answer, model_answer, correctness,
+correctness_score, domain, dataset, adversarial, type.
 
-Universal columns shared by all datasets:
-    id, question, reference_answer, model_answer, correctness,
-    correctness_score, domain, dataset, adversarial, type
+Correctness labels: correct | incorrect | refused.
 
-All datasets use three correctness labels: correct, incorrect, refused.
-
-NOTE — Domain validity warning
--------------------------------
-Domains are assigned per-response by the LLM judge and are frequently
-inconsistent across the 20 responses for a single question (14–36% of
-questions, depending on dataset). Datasets other than DefAn have severe
-domain sprawl (30–90 unique strings). The domain_mode column below uses
-majority-vote per question, but this is still a noisy proxy. See
-analysis/eda.py for diagnostics.  All domain-level results should be
-interpreted cautiously — they are exploratory rather than confirmatory.
-
-Methods sourced from hallucination_utils.py (Debanjan Bhattacharya).
+NOTE: Domain labels are LLM-generated and noisy (14-36% inconsistency across
+responses for a single question). All domain-level results are exploratory.
 """
 
 import os
@@ -33,26 +22,31 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
-# ── Label constants ────────────────────────────────────────────────────────────
+# ── Constants ──────────────────────────────────────────────────────────────────
 
-LABEL_ORDER   = ["correct", "incorrect", "refused"]
-LABEL_COLORS  = {"correct": "#2196F3", "incorrect": "#E53935", "refused": "#FFA726"}
-GEO_FEATURES  = ["H_sem", "D_cos", "D_cos_var", "D_pair",
-                  "M_bar", "K", "sig2_S"]
-FEAT_NICE_NAMES = {
-    "H_sem":    "Semantic Entropy",
-    "D_cos":    "Cosine Dispersion (mean centroid)",
-    "D_cos_var":"Cosine Dispersion (variance centroid)",
-    "D_pair":   "Mean Pairwise Cosine Distance",
-    "M_bar":    "Mahalanobis Distance (mean)",
-    "K":        "Cluster Count",
-    "sig2_S":   "Similarity Variance",
+LABEL_ORDER  = ["correct", "incorrect", "refused"]
+LABEL_COLORS = {"correct": "#2196F3", "incorrect": "#E53935", "refused": "#FFA726"}
+
+FEATURES = [
+    "H_sem", "D_cos", "D_cos_var", "D_pair", "K", "sig2_S",
+]
+
+FEATURE_LABELS = {
+    "H_sem":     "Semantic Entropy",
+    "D_cos":     "Cosine Dispersion (mean centroid)",
+    "D_cos_var": "Cosine Dispersion (variance centroid)",
+    "D_pair":    "Mean Pairwise Cosine Distance",
+    "K":         "Cluster Count",
+    "sig2_S":    "Similarity Variance",
 }
 
-# ── Canonical domain patterns ──────────────────────────────────────────────────
-# Method from hallucination_utils.py
+# Backward-compatible aliases
+GEO_FEATURES   = FEATURES
+FEAT_NICE_NAMES = FEATURE_LABELS
 
-_CANONICAL_PATTERNS = [
+# ── Canonical domain patterns ──────────────────────────────────────────────────
+
+_DOMAIN_PATTERNS = [
     ("Humanities",            r"(?i)\bhumanit"),
     ("STEM",                  r"(?i)\bstem\b"),
     ("Social Sciences",       r"(?i)\bsocial\s*sci"),
@@ -75,95 +69,58 @@ _CANONICAL_PATTERNS = [
 # ── Loading ────────────────────────────────────────────────────────────────────
 
 def load_dataset(path, required_cols=None):
-    """
-    Load a JSONL dataset; ensure prompt_id and answer_len columns exist.
-    Method from hallucination_utils.py.
-
-    Parameters
-    ----------
-    path : str
-        Path to .jsonl file.
-    required_cols : list, optional
-        Columns that must be present; raises ValueError if any are missing.
-
-    Returns
-    -------
-    pd.DataFrame  — response-level dataframe, one row per model answer.
-    """
+    """Load a JSONL dataset; ensure prompt_id and answer_len exist."""
     df = pd.read_json(path, lines=True)
     if required_cols:
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
             raise ValueError(f"Missing required columns: {missing}")
 
-    # DefAn has no prompt_id; derive from id
     if "prompt_id" not in df.columns:
         df["prompt_id"] = df["id"].astype(str).str.rsplit("_", n=1).str[0]
-
     if "answer_len" not in df.columns:
         df["answer_len"] = df["model_answer"].astype(str).str.len()
-
     return df
 
 
 def load_all_datasets(data_dir):
-    """
-    Load every *.jsonl in data_dir.
-    Returns dict keyed by dataset name (e.g. 'defan', 'mmlu', ...).
-    Method from hallucination_utils.py.
-    """
+    """Load every *.jsonl in data_dir. Returns dict keyed by dataset name."""
     datasets = {}
     for fname in sorted(os.listdir(data_dir)):
         if not fname.endswith(".jsonl"):
             continue
         df = load_dataset(os.path.join(data_dir, fname))
-        name = df["dataset"].iloc[0]
-        datasets[name] = df
+        datasets[df["dataset"].iloc[0]] = df
     return datasets
 
 
 # ── Domain helpers ─────────────────────────────────────────────────────────────
 
 def _mode(series):
-    """Statistical mode; first value on ties. Method from hallucination_utils.py."""
+    """Statistical mode; first value on ties."""
     m = series.mode()
     return m.iloc[0] if len(m) else series.iloc[0]
 
 
 def consolidate_domain(raw_domain):
-    """
-    Map a raw (potentially noisy) domain string to a canonical category.
-    Returns "Other" if no pattern matches.
-    Method from hallucination_utils.py.
-    """
-    for canonical, pattern in _CANONICAL_PATTERNS:
+    """Map a noisy domain string to a canonical category. Falls back to 'Other'."""
+    for canonical, pattern in _DOMAIN_PATTERNS:
         if re.search(pattern, raw_domain):
             return canonical
     return "Other"
 
 
 def add_canonical_domain(df, col="domain"):
-    """
-    Add a domain_canonical column via consolidate_domain.
-    Method from hallucination_utils.py.
-    """
+    """Add domain_canonical column via regex consolidation."""
     df = df.copy()
     df["domain_canonical"] = df[col].apply(consolidate_domain)
     return df
 
 
-# ── Question-level metadata ────────────────────────────────────────────────────
+# ── Question-level metadata ───────────────────────────────────────────────────
 
 def compute_question_metadata(df, domain_col="domain"):
-    """
-    Aggregate per-question metadata from a response-level dataframe.
-    Method from hallucination_utils.py.
-
-    Returns DataFrame indexed by prompt_id with columns:
-        question, reference_answer, dataset, adversarial,
-        domain_mode, n_unique_domains, domain_inconsistent,
-        and type if it has more than one unique value.
-    """
+    """Aggregate per-question metadata (domain mode, inconsistency flag, etc.)."""
     agg = {
         "question":         ("question", "first"),
         "reference_answer": ("reference_answer", "first"),
@@ -181,10 +138,7 @@ def compute_question_metadata(df, domain_col="domain"):
 
 
 def questions_per_domain(df, domain_col="domain"):
-    """
-    Unique question counts per domain, descending.
-    Method from hallucination_utils.py.
-    """
+    """Unique question counts per domain, descending."""
     return (
         df.groupby(domain_col)["prompt_id"]
         .nunique()
@@ -193,11 +147,8 @@ def questions_per_domain(df, domain_col="domain"):
 
 
 def split_analysis_domains(feat_df, min_questions, domain_col="domain"):
-    """
-    Return (analysis_domains, excluded_domains) based on minimum question count.
-    Method from hallucination_utils.py.
-    """
+    """Split domains into analysis (>= min_questions) and excluded sets."""
     counts = feat_df[domain_col].value_counts()
     analysis = sorted(counts[counts >= min_questions].index.tolist())
-    excluded  = sorted(set(counts.index) - set(analysis))
+    excluded = sorted(set(counts.index) - set(analysis))
     return analysis, excluded

@@ -62,22 +62,23 @@ spring-2026-llm_hallucinations-project/
 │
 ├── requirements.txt
 └── README.md
+```
 
 ---
 
-## Datasets
+### Datasets
 
 | Dataset | Questions | Notes |
 |---------|-----------|-------|
 | DefAn | 500 | Definitional QA; unique `type` field; no canonical domain needed |
-| HaluEval | 500 | Curated hallucination pairs; 30 raw domains → canonical |
+| HaluEval | 500 | Curated hallucination pairs; 30 raw domains |
 | MMLU | 500 | 57-subject benchmark; 65 raw domains → canonical |
-| TriviaQA | 500 | Trivia reading-comprehension; 64 raw domains → canonical |
-| TruthfulQA | 500 | Adversarial misconception questions; 90 raw domains → canonical |
+| TriviaQA | 500 | Trivia reading-comprehension; 64 raw domains |
+| TruthfulQA | 500 | Adversarial misconception questions; 90 raw domains |
 
 ---
 
-## Seven Geometric Features (Baseline Pipeline)
+### Six Geometric Features (Baseline Pipeline)
  
 | Symbol | Name | Description | Reference |
 |--------|------|-------------|-----------|
@@ -85,13 +86,12 @@ spring-2026-llm_hallucinations-project/
 | D_cos | Cosine Dispersion (mean centroid) | Mean distance from each embedding to the centroid | Ricco et al. (2025) |
 | D_cos_var | Cosine Dispersion (variance centroid) | Variance of per-response centroid distances; captures asymmetric scatter | - |
 | D_pair | Mean Pairwise Cosine Distance | Mean of (1 − S_jk) across all response pairs; complements D_cos | - |
-| M_bar | Mahalanobis Distance (mean) | Mean distance from the correct-response reference distribution | Lee et al. (2018) |
 | K | Cluster Count | Number of agglomerative clusters | — |
 | sig2_S | Similarity Variance | Variance of pairwise cosine similarities | — |
 
 ---
 
-## Spectral Graph Features (`spectral_graph.ipynb`)
+### Spectral Graph Features (`spectral_graph.ipynb`)
 
 An extended feature set built on the graph Laplacian **L = D − W**, where W is
 the N×N cosine similarity matrix (diagonal zeroed, negatives clipped).

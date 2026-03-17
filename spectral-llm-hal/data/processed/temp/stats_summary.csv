@@ -1,7 +1,7 @@
-Dataset,N_questions,Hallu_rate,KS_sig_features,Best_KS_feature,Perm_delta_bits,Perm_pval,Bootstrap_AUC
-defan,500,79.6%,5,M_bar,1.6747,0.0,"0.905 [0.864, 0.940]"
-halueval,500,7.2%,7,sig2_S,1.2933,0.0,"0.869 [0.785, 0.941]"
-mmlu,500,78.4%,5,M_bar,0.3847,0.0,"0.902 [0.846, 0.947]"
-triviaqa,500,41.6%,7,M_bar,2.0118,0.0,"0.968 [0.946, 0.988]"
-truthfulqa,500,72.0%,5,M_bar,1.1194,0.0,"0.922 [0.885, 0.956]"
-combined,2500,55.8%,7,H_sem,1.9928,0.0,"0.942 [0.929, 0.954]"
+Dataset,N_questions,Hallu_rate,KS_sig_features,Best_KS_feature,Perm_delta,Perm_pval,Bootstrap_AUC
+defan,500,79.6%,4,H_sem,1.6747,0.0001,"0.858 [0.811, 0.900]"
+halueval,500,7.2%,6,sig2_S,1.2933,0.0001,"0.801 [0.707, 0.882]"
+mmlu,500,78.4%,4,H_sem,0.3847,0.0001,"0.657 [0.580, 0.727]"
+triviaqa,500,41.6%,6,D_cos,2.0118,0.0001,"0.900 [0.862, 0.933]"
+truthfulqa,500,72.0%,4,H_sem,1.1194,0.0001,"0.710 [0.647, 0.775]"
+combined,2500,55.8%,6,H_sem,1.9928,0.0001,"0.871 [0.853, 0.888]"

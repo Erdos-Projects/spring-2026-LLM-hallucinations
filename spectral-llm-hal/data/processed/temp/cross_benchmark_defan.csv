@@ -1,0 +1,6 @@
+Classifier,Train_AUC,Test_AUC,Test_AP,Test_F1,Train_n,Test_n
+Logistic Regression,0.8743,0.8712,0.9658,0.8412,2000,500
+ElasticNet Logit,0.8743,0.8714,0.9659,0.8412,2000,500
+Random Forest,0.9226,0.8615,0.9633,0.8255,2000,500
+Gradient Boosting,0.9278,0.8604,0.9629,0.8312,2000,500
+XGBoost,0.9546,0.8429,0.957,0.8209,2000,500

@@ -1,7 +1,7 @@
 Dataset,Best_Variant,Best_Clf,AUC,Avg_Precision,Brier,F1_at_0.5,Eval_mode
-defan,"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",Logistic Regression,0.8953,0.974,0.1226,0.8846,hold-out test set
-halueval,Entropy + Geometry,XGBoost,0.967,0.6624,0.0464,0.4,hold-out test set
-mmlu,"Geometry only (D_cos, D_cos_var, D_pair, M_bar)",Logistic Regression,0.9545,0.9879,0.0767,0.9325,hold-out test set
-triviaqa,Entropy + Geometry,Random Forest,0.9704,0.943,0.0487,0.9438,hold-out test set
-truthfulqa,Entropy + Geometry,Random Forest,0.9157,0.9719,0.1215,0.8742,hold-out test set
-combined,All 7 geometric,XGBoost,0.9593,0.971,0.0806,0.9065,hold-out test set
+defan,"Geometry only (D_cos, D_cos_var, D_pair)",Logistic Regression,0.8231,0.9532,0.1339,0.8642,hold-out
+halueval,All 6 geometric,Random Forest,0.9478,0.6627,0.0444,0.25,hold-out
+mmlu,"Geometry only (D_cos, D_cos_var, D_pair)",ElasticNet Logit,0.7185,0.8987,0.1559,0.8621,hold-out
+triviaqa,Entropy only (H_sem),Logistic Regression,0.9218,0.9081,0.1067,0.8101,hold-out
+truthfulqa,"Geometry only (D_cos, D_cos_var, D_pair)",Gradient Boosting,0.6939,0.864,0.1875,0.8242,hold-out
+combined,All 6 geometric,ElasticNet Logit,0.9059,0.9295,0.1269,0.8427,hold-out
