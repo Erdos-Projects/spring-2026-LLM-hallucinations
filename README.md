@@ -8,7 +8,7 @@
 
 [Helmut Wahanik](https://github.com/hwahanik), 
 [Santanil Jana](https://github.com/sjana01),
-[Debanjan Sarkar](https://github.com/ajv7674-lgtm),
+[Debanjan Sarkar](https://github.com/debanjan-cosmo),
 [AJ Vargas](https://github.com/ajv7674-lgtm),
 [Guoqin Liu](https://github.com/hellolgq),
 
