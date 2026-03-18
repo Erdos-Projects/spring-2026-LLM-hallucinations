@@ -2,43 +2,69 @@
 
 # LLM Hallucination Detector
 
-### LLM Hallucination via Semantic Entropy, Embedding Geometry, and Attention Heads Spectrum.
+### LLM Hallucination via Attention Heads Spectrum, Semantic Entropy, and Embedding Geometry
 
 # Project members:
 
-[Helmut Wahanik](https://github.com/hwahanik), 
+[Helmut Wahanik](https://github.com/hwahanik),
 [Santanil Jana](https://github.com/sjana01),
-[Debanjan Sarkar](https://github.com/ajv7674-lgtm),
+[Debanjan Sarkar](https://github.com/debanjan-cosmo),
 [AJ Vargas](https://github.com/ajv7674-lgtm),
-[Guoqin Liu](https://github.com/hellolgq),
+[Guoqin Liu](https://github.com/hellolgq)
 
 ## Mini-Abstract
 
-Our project is based on a problem that most people have encountered since the rise of the chatbots:  LLM's fail to answer
-correctly on numerous occassions.  
+Hallucinations commonly occur when a Large Language Model (LLM) faces unexpected or rare prompts. While rapid advances in LLMs followed the introduction of the attention mechanism (in the seminal paper “Attention Is All You Need”), the underlying mechanics of neural network inference remain opaque. Because these models often operate as a “black box,” active research is dedicated to shedding light on exactly how an LLM processes information. This leads to our first question:
 
-`Part I`:  Detecting LLM hallucinations using the top-k eigenvalues of the Laplacian of the Attention Heads from the Transformer Architecture (Binkoswki et. al 2025).
+`Question 1:`  Can we observe some natural correlation between hallucinations produced by an LLM and the numerical data that propagates through it? 
 
-`Part II`:  Original work for detecting LLM hallucinations using known embedding space geometric and spectral properties: e.g. the semantic entropy (Farquhar et al., 2024) and embedding geometry (Ricco et al., 2025; Lee et al., 2018).
+For answering it our project runs a **Data Science Neurosurgery on the Transformer’s Attention heads**, and trains the top-k eigenvalues of Attention against the label “hallucination or not”.
+AI creativity and power comes from random draws.  LLMs prcess the information by inferring the next “token” of a response through probability sampling, at a certain “temperature” $T$.  Low temp $T\sim 0$ $\rightarrow$ always pick token with highest probability, making the pick “deterministic.  High temp implies a more “generative” and “creative” process. 
 
-## Data Generation:
+*As a consequence we make the next question:*
 
-All responses generated with **Llama-3.2-3B** (Colab H100, ~2 hours), labelled by **GPT-4.1-nano** (CPU runtime, ~20h in total).  
+`Question 2:`  Can we predict hallucinations by only analyzing the geometric and spectral properties of probability distributions built during the Generative process of an LLM? 
 
-All responses generated with **Llama-3.2-3B** (Colab H100, ~40–60 min), labelled by **GPT-4.1-nano** (CPU runtime, ~1.5–3 h), with nuclear sampling.  Llama allows extraction of the attention heads for the last token of the decoder's step.
+Indeed, to answer this we note that there exists a natural mapping between prompts and the space of distribution of responses.  In the second part of our project we convert a variable-length set of text responses into a fixed-size **numeric feature vector** that captures whether the model is hallucinating.  For each question $q_{i}$ in our dataset, we sample $N = 20$ responses. Each response is a string of text. We embed each response into a vector $e_{ij} \in \mathbb{R}^{384}$ (using a sentence transformer). At this point, we have $N=20$ vectors per question, but we do not use these 20 vectors as 20 separate rows in our dataset. Instead, we aggregate them into a single feature vector that summarises the distribution of responses for that question.  
+
+Our work introduces a feature vector that summarizes the distribution of responses, and is composed of `semantic and geometric` metrics as those introduced by Farquhar et. al. 2024, Ricco et al., 2025, Zhao et al., 2025, Lee et al., 2018, such as the following:
+
+1. Semantic entropy $H_{sem}$: How many distinct meanings appear in the 20 responses? 
+
+2. Cosine dispersion $D_{cos}$ and pair-wise mean $D_{pair}$: How spread out are the 20 embeddings around their centre?  How heavily do they interact with each other?  
+
+3. Cluster count $K$: How many semantic clusters do the 20 responses form?
+
+4. Similarity variance $\sigma^{2}_{S}$: How uneven is the agreement between response pairs?
+
+We go a step further and introduce additional features corresponding to the `graph connectivity` of the distribution of responses, indicating degree of connectivity of the distribution of responses.  
+
+### Data Collection Pipeline: 
+
+Generative training data was collected and computed using diverse benchmarks (shown in the table below).  Each question was reformatted to fit a Python dictionary of the form:  
+
+```bash
+[“question”, “reference_answer”, “choices”], 
+```
+
+and passed to our LLM of choice, Llama-3.2-3B (quantized to 4bits).  Llama is forced to answer at a temperature of 1.0 (“to be more creative”).  The LLM’s response is collected in a standardized dataframe.  For answering `Question 1`, we simultaneously extract the Attention Heads matrices (stored temporarily in RAM) to calculate the top-k eigenvalues which we encode in binary files.  For `Question 2` we generate $N=20$ responses for each prompt.  The responses are evaluated by a “more powerful” LLM-Judge.  Our judge is a “lightweight” LLM, such as GPT-Mini or GPT-4.1-nano;  we use standardized prompting (please refer to `config.py`) in order to “instruct” the judge to also answer under pre-defined format.  Multi-sampled responses are cleaned and filtered, and embedded into a the high dimensional space $\mathbb{R}^{384}$ using pre-trained Sentence Transfomers, and aggregated as features as described in `notebooks/06_geo_feature.ipynb`.  The data collection workflow is shown below:
+
+<img src="/images/data_collection.png" alt="Description" width="1000" />
+
+## Data Computing:
+
+For eigenvalue extraction, responses were generated with **Llama-3.2-3B**, running in Colab in a GPU H100, and labelled by **GPT-4.1-nano**, using nuclear sampling.  Llama allows extraction of the attention heads for the last token of the decoder's step.
 
 ---
-## Hallucination Detection via Spectral Features of Attention Maps
+## `Part I: Hallucination Detection via Spectral Features of Attention Maps`
 
-This project studies whether **Laplacian eigenvalues of attention maps** can be used to detect hallucinated responses from an LLM. Starting from token-level attention matrices, we extract graph-based features from every attention head and layer, compress them with PCA, and train lightweight classifiers to distinguish **correct** from **hallucinated** answers. The workflow follows a progression from raw signal analysis, to predictive modeling, to statistical validation.
+In Part I of our project we study whether **Laplacian eigenvalues of attention maps** can be used to detect hallucinated responses from an LLM. Starting from token-level attention matrices, we extract graph-based features from every attention head and layer, compress them with PCA, and train lightweight classifiers to distinguish **correct** from **hallucinated** answers. The workflow follows a progression from raw signal analysis, to predictive modeling, to statistical validation.
 
 ### Feature Engineering
 
 For each layer $l$ and head $h$, the attention map $A^{(l,h)}$ is viewed as a directed graph, and its graph Laplacian is defined by
-$$
-L^{(l,h)} = D^{(l,h)} - A^{(l,h)}.
-$$
-Because the Laplacian is lower triangular in this setup, its eigenvalues lie on the diagonal and are bounded in $[-1,1]$. From each layer-head block, we retain the **top 10 eigenvalues**, producing a large raw feature vector per example. With $32$ layers and all heads included, this yields roughly **10,320 raw spectral features per question**.
+$L^{(l,h)} = D^{(l,h)} - A^{(l,h)}$
+Because the Laplacian is lower triangular given that we extract the Attentions at the decoder level, the eigenvalues lie on the diagonal and are bounded in $[-1,1]$. From each layer-head block, we retain the **top 10 eigenvalues**, producing a large raw feature vector per example. With $32$ layers and all heads included, this yields roughly **10,320 raw spectral features per question**!
 
 These raw features are high-dimensional and highly correlated, so we apply **Principal Component Analysis (PCA)** as the central feature-engineering step. PCA serves two purposes: it reduces dimensionality and it denoises the feature space by concentrating most of the useful variance into a smaller number of orthogonal components. In the main pipeline, the full spectral vector is reduced to **384 PCA dimensions**, while some visualization and layer-wise analyses use smaller PCA projections such as 64 dimensions. This makes downstream training faster and more stable without discarding the dominant structure in the eigenvalue features.
 
@@ -46,9 +72,9 @@ These raw features are high-dimensional and highly correlated, so we apply **Pri
 
 The primary supervised pipeline is:
 
-1. standardize the raw spectral features,  
-2. apply PCA,  
-3. train a binary classifier on the reduced representation.
+1. Standardize the raw spectral features,  
+2. Apply PCA,  
+3. Train a binary classifier on the reduced representation.
 
 The baseline probe in the project document is **logistic regression on PCA-projected eigenvalue features**, which serves as a strong and interpretable reference model. In later experiments on the combined **TriviaQA + MMLU** dataset, we also compare several alternative classifiers, including **Linear SVM + calibration**, **Random Forest**, **AdaBoost**, and **SGDClassifier**. This lets us test whether the signal is primarily linear or whether it benefits from more complex nonlinear decision boundaries.
 
@@ -75,21 +101,65 @@ The project uses five main visualizations plus a bootstrap test:
 
 - **Bootstrap statistical validation.**  
   Independently of the classifier, the project tests whether hallucinated samples have a higher mean leading Laplacian eigenvalue $\lambda_{\max}$. The bootstrap computes the observed difference
-  $$
-  \delta_{\mathrm{obs}}=\overline{\lambda_{\max}}(y=1)-\overline{\lambda_{\max}}(y=0),
-  $$
+  $\delta_{\mathrm{obs}}=\overline{\lambda_{\max}}(y=1)-\overline{\lambda_{\max}}(y=0)$
   and estimates a one-sided p-value and 95% confidence interval by resampling with replacement. This provides formal inferential support for the raw spectral hypothesis without assuming Gaussianity.
 
-## Final Results and Main Takeaways
+### Final Results and Main Takeaways
 
 A key empirical result is that the **combined TriviaQA + MMLU dataset** performs better than either dataset alone and yields the **best AUROC observed so far**. This suggests that the two datasets contribute complementary information and that the spectral signature of hallucination becomes clearer when the training set is larger and more diverse.
 
 Across classifier comparisons on the merged dataset, **Logistic Regression + PCA** achieves the strongest AUROC, while **Linear SVM + Calibration** performs similarly and slightly edges it in test accuracy. Tree-based ensemble models such as Random Forest and AdaBoost perform worse, which points to an important conclusion: after PCA, the hallucination signal appears to be **well captured by a low-dimensional, mostly linear representation**. In other words, PCA is doing much of the heavy lifting by transforming the raw topological features into a cleaner feature space where simple linear probes are already effective.
 
-Overall, the project supports the following story: **attention-map Laplacian eigenvalues contain a measurable and transferable signature of hallucination**, PCA turns this large and noisy spectral representation into a compact and trainable feature space, and simple linear models on top of PCA are strong enough to achieve competitive hallucination detection performance. The bootstrap results strengthen this interpretation by showing that the leading eigenvalue itself carries statistically meaningful class information.
+Overall, the project supports the following story: **Attention-map Laplacian eigenvalues contain a measurable and transferable signature of hallucination**, PCA turns this large and noisy spectral representation into a compact and trainable feature space, and simple linear models on top of PCA are strong enough to achieve competitive hallucination detection performance. The bootstrap results strengthen this interpretation by showing that the leading eigenvalue itself carries statistically meaningful class information.  To productionize this tool, it is crucial
+to obtain API access to the internal architecture of the Transformer during run-time.  
+
+Due to constraints of using external vendors during Agentic RAG deployment, we acknowledged the need of a second tool for the `LLM Detector`, and the Semantic and Geometric workflow satisfies
+these needs as shown next.
+
+## `Part II: Assessing question-level hallucination risk from response cloud features`
+
+In Part II of our project we study whether patterns in the distribution of an LLM's repeatedly sampled reponses to a given question can reliably determine whether the LLM is likely to give a hallucinated answer for that question. Our basic premise is that when an LLM is uncertain about a question, it will tend to exhibit higher semantic spread / fragmentation / instability across repeatedly sampled responses, which should lead to higher hallucination risk. We thus train our models to predict hallucination probability from features chosen precisely to capture semantic spread / fragmentation / instability within response clouds. (See below the "Folder Structure" and "Datasets" portion of this readme for the feature breakdown).
+
+### Some remarks on class distribution across datasets
+
+We found HaluEval was the ‘easiest’ dataset for the our LLM, as its prompts contained context; TriviaQA had the most balanced distribution of $\%$ correctness ($p_{hat}$) – “medium difficulty”; the rest were more heavily skewed to $\%$ incorrectness – “hard difficulty” – overall balanced class distribution across all 5 datasets.
+
+For threshold correctness (“$y$”), MMLU was the most difficult: hardest for the LLM to get $>50\%$ in MMLU, but usually it got at least a few right in each response cluster.
+
+Overall the distribution of correctness is bimodal across all datasets: most often the model LLM fails entirely, or is entirely correct in each response cloud.
+
+<img src="/images/boxplot.png" alt="Description" width="500" />
 
 
+### Baseline training story and results
 
+We carried out our training on the baseline feature set (/spectral-llm-hal/notebooks/05_training.ipynb) in essentially two regimes: 5 individual training runs on each 500 question/10,000 sample datasets individually, and one training run on the 2500 question/50,000 sample dataset aggregated from the 5 individuals. In each run we held out 20% of the data for a final test once the best performing model on training data was selected. Additionally, during each training run we carried out an ablation study to determine the best configuration of features for model performance.
+
+Due to the relatively small dataset sizes and class imbalance within across datasets, we stratified the target variable in each train/test split, and we evaluated model performance on training data using 5-fold cross validation. Since our goal for this project was not perfect performance optimization, we opted not to include hyperparameter tuning to inform model selection. The four models we tested were baseline Logistic Regression, ElasticNet logit (saga solver + l1_ratio = 0.5), Random Forest, Gradient Boosting, and XGBoost.
+
+We saw some variation in best feature configuration across the individual datasets, **with geometry features carrying the most predictive signal in the harder datasets**. As far as performance on the test sets, we found that all models struggled with the "difficult" datasets in isolation (though still performing well above chance, receiving AUC scores ranging from ~0.69-0.82 on the difficult sets). However, performance improved significantly when the models were trained on the aggregated dataset, receiving AUC score ~0.91 on the test set.
+
+In the end we found that the **ElasticNet Logit trained on all 6 features** gave the best overall perfoamnce, showing that our baseline feature selection carries clean hallucination signals captured by simple logistic-based probes (with combined $l_{1}$ and $l_{2}$ penalties offcourse), aligning well with our initial premise.
+
+We also tested feature importance and found the majority of hallucination detection signal was carried by the features $D_{cos}$ (semantic spread) and $H_{sem}$ (fragmentation measure), with $\sigma^{2}_{S}$ (instability measure) carrying relatively smaller but complementary signal.
+
+### Secondary feature set examination
+
+In addition to our main 6-feature baseline discussed above, we wondered whether in place of dispersion and entropy we could find a different set of features that carried a similar predictive power. For this we looked to **response-graph spectral features** (see Group A below) and **extended cluster structure features** (Group B). We tested these alternate features (`08_geo_spectral_graph.ipynb`) and found that taken together, Group A + Group B features would indeed carry comparable predictive power, however when taken together with the baseline features, they did not contribute meaningful additional signal.
+
+Being able to work with this secondary feature set may potentially be helpful in generalizations of our pipeline, where different LLMs, datasets, or higher sample sizes (etc) may be preferable.
+
+### Statistical tests and EDA findings
+
+We also performed statistical tests such as `KS Test`, to validate that distributions were distinct enough, `Permutation Test`  to determine whether the model has learned a genuine dependency between the features and the target labels, and `Bootstrap` to prove that the classifiers used for train our model reliably outperform chance.  See 
+`07_geo_statistics.ipynb`.
+
+### Impact on Large Scale AI Deployment
+
+1. Our hallucination detector mitigates risk by catching severe AI errors very early. 
+2. It can integrate seamlessly into any Agentic API, monitoring high-temperature sampling in real-time to trigger fact-checking, only when necessary. 
+3. Because it is was optimized specifically for anomaly detection, it delivers the reliability of standard judge models at half the compute cost.
+4. Ultimately, our novel system will help protect any company’s brand reputation, the safety and quality of it’s AI systems, while allowing it’s business to scale AI features profitably.
 
 ## Folder Structure
 
@@ -203,21 +273,21 @@ Eigendecomposition gives $0 = \lambda_{1} \leq \lambda_{2} \leq \lambda_{3} \leq
 
 ```bash
 
-# Geometric detection
-
-# 1. EDA:  notebooks/02_eda.ipynb
-
-# 2. Embed + extract features:  notebooks/03_feature_extraction.ipynb
-
-# 3. Statistical tests:  notebooks/04_statistics.ipynb
-
-# 4. Training, ROC, SHAP:  notebooks/05_training.ipynb
-
-# 5. Visualization part I and II:  notebooks/05_visualization, notebooks/05_visualization_partII
-
-
 # Attention heads detection
 
-# 6.  
+# Generating data for all the project:  01_data_generation.ipynb
+# Data for attention matrices           02_attention_datagen.ipynb
+# EDA and Training attention            03_attention_feature_training.ipynb
+# Visualization attention               04_attention_visualization.ipynb
+
+# Semantic and Geometric detection
+
+# EDA Geometric and Semantic            05_geo_eda.ipynb
+# Embed + extract features              06_geo_feature_extraction.ipynb
+# Stats geometric                       07_geo_statistics.ipynb
+# Training geometric                    08_geo_training.ipynb
+# Spectral                              09_geo_spectral_graph.ipynb
+# t-SNE visualizations                  10_geo_visualization.ipynb
+# Advanced visualizations                11_geo_visualization_partII.ipynb
 
 ```
