@@ -14,38 +14,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
 
-# def build_training_dataset_eigen_only(jsonl_path: str, pt_path: str):
 
-#     with open(jsonl_path, "r") as f:
-#         df_meta = pd.DataFrame([json.loads(line) for line in f])
-
-#     pt_payload = torch.load(pt_path, map_location="cpu", weights_only=True)
-#     feature_dict = pt_payload.get("data", pt_payload)
-
-#     # Extract the eigenvalue arrays
-#     feature_rows = []
-#     for record_id, payload in list(feature_dict.items()):
-#         eig_array = payload.numpy().astype(np.float32)
-
-#         feature_rows.append({"id": record_id, "features": eig_array})
-
-#     df_features = pd.DataFrame(feature_rows)
-
-#     # Inner join to guarantee perfect alignment between features and labels
-#     df_final = pd.merge(df_meta, df_features, on="id", how="inner")
-
-#     # Filter errors and construct the binary label vector
-#     df_final = df_final[df_final["correctness"] != "error"]
-#     df_final["label"] = df_final["correctness"].apply(lambda x: 1 if x.lower() == "correct" else 0)
-
-#     # Formulate the X and y matrices
-#     X = np.vstack(df_final["features"].values)
-#     y = df_final["label"].values
-
-#     print(f"Feature Matrix (X) shape: {X.shape}")
-#     print(f"Label Vector (y) shape: {y.shape}")
-
-#     return df_final, X, y
 
 def build_training_dataset_eigen_only(jsonl_path: str, pt_path: str):
 

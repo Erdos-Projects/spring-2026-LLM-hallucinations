@@ -1,43 +1,52 @@
-# Python
+# Ignore all .txt files, except for strictly required documentation
+*.txt
+!readme.txt
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
 
-# Jupyter
-.ipynb_checkpoints/
 
-# OS / editor
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
+# # Python
+# __pycache__/
 
-# Logs
-*.log
+# # Jupyter
+ .ipynb_checkpoints/
 
-# Common large / data file types
+# # OS / editor
+# .DS_Store
+# Thumbs.db
+# .vscode/
+# .idea/
+
+# # Logs
+# *.log
+
+# # Common large / data file types
 *.csv
 *.tsv
 *.txt
-*.json
-*.jsonl
-*.parquet
-*.feather
-*.pkl
-*.pickle
-*.joblib
-*.pt
-*.pth
-*.npy
-*.npz
-*.h5
-*.hdf5
-*.ckpt
+# *.json
+# *.jsonl
+# *.parquet
+# *.feather
+# *.pkl
+# *.pickle
+# *.joblib
+# *.pt
+# *.pth
+# *.npy
+# *.npz
+# *.h5
+# *.hdf5
+# *.ckpt
 
-# Images / generated figures
-*.png
-*.jpg
-*.jpeg
-*.pdf
-*.svg
+# # Images / generated figures
+# *.png
+# *.jpg
+# *.jpeg
+# *.pdf
+# *.svg
 
 # Keep example or placeholder files if needed
 !data/.gitkeep
