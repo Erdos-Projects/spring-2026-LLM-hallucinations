@@ -63,7 +63,7 @@ In Part I of our project we study whether **Laplacian eigenvalues of attention m
 ### Feature Engineering
 
 For each layer $l$ and head $h$, the attention map $A^{(l,h)}$ is viewed as a directed graph, and its graph Laplacian is defined by
-$L^{(l,h)} = D^{(l,h)} - A^{(l,h)}$
+$L^{(l,h)} = D^{(l,h)} - A^{(l,h)}$.
 Because the Laplacian is lower triangular given that we extract the Attentions at the decoder level, the eigenvalues lie on the diagonal and are bounded in $[-1,1]$. From each layer-head block, we retain the **top 10 eigenvalues**, producing a large raw feature vector per example. With $32$ layers and all heads included, this yields roughly **10,320 raw spectral features per question**!
 
 These raw features are high-dimensional and highly correlated, so we apply **Principal Component Analysis (PCA)** as the central feature-engineering step. PCA serves two purposes: it reduces dimensionality and it denoises the feature space by concentrating most of the useful variance into a smaller number of orthogonal components. In the main pipeline, the full spectral vector is reduced to **384 PCA dimensions**, while some visualization and layer-wise analyses use smaller PCA projections such as 64 dimensions. This makes downstream training faster and more stable without discarding the dominant structure in the eigenvalue features.
@@ -101,8 +101,8 @@ The project uses five main visualizations plus a bootstrap test:
 
 - **Bootstrap statistical validation.**  
   Independently of the classifier, the project tests whether hallucinated samples have a higher mean leading Laplacian eigenvalue $\lambda_{\max}$. The bootstrap computes the observed difference
-  $\delta_{\mathrm{obs}}=\overline{\lambda_{\max}}(y=1)-\overline{\lambda_{\max}}(y=0)$
-  and estimates a one-sided p-value and 95% confidence interval by resampling with replacement. This provides formal inferential support for the raw spectral hypothesis without assuming Gaussianity.
+  $\delta_{\mathrm{obs}}=\overline{\lambda}_{\max}(y=1)-\overline{\lambda}_{\max}(y=0)$,
+  and estimates a one-sided $p$-value and 95% confidence interval by resampling with replacement. This provides formal inferential support for the raw spectral hypothesis without assuming Gaussianity.
 
 ### Final Results and Main Takeaways
 
