@@ -100,8 +100,8 @@ The project uses five main visualizations plus a bootstrap test:
   Trains on one dataset and tests on another, producing a matrix of AUROC values. Strong off-diagonal performance indicates that the spectral signal transfers across benchmarks instead of depending on dataset-specific quirks. The project document notes that **MMLU** and **TriviaQA** are expected to transfer well to **NQ-Open**, while **TruthfulQA** may behave as an outlier because of its adversarial phrasing.
 
 - **Bootstrap statistical validation.**  
-  Independently of the classifier, the project tests whether hallucinated samples have a higher mean leading Laplacian eigenvalue $\lambda_{\max}$. The bootstrap computes the observed difference
-  $\delta_{\mathrm{obs}}=\overline{\lambda}_{\max}(y=1)-\overline{\lambda}_{\max}(y=0)$,
+  Independently of the classifier, the project tests whether hallucinated samples have a higher mean leading Laplacian eigenvalue $\lambda_{1}$. The bootstrap computes the observed difference
+  $\delta_{\mathrm{obs}}=\overline{\lambda_{1}}(y=1)-\overline{\lambda_{1}}(y=0)$,
   and estimates a one-sided $p$-value and 95% confidence interval by resampling with replacement. This provides formal inferential support for the raw spectral hypothesis without assuming Gaussianity.
 
 ### Final Results and Main Takeaways
