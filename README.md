@@ -124,7 +124,7 @@ In Part II of our project we study whether patterns in the distribution of an LL
 
 We found HaluEval was the ‘easiest’ dataset for the our LLM, as its prompts contained context; TriviaQA had the most balanced distribution of $\%$ correctness ($p_{hat}$) – “medium difficulty”; the rest were more heavily skewed to $\%$ incorrectness – “hard difficulty” – overall balanced class distribution across all 5 datasets.
 
-For threshold correctness (“$y$”), MMLU was the most difficult: hardest for the LLM to get $>50\%$ in MMLU, but usually it got at least a few right in each response cluster.
+For threshold correctness ($y$), MMLU was the most difficult: hardest for the LLM to get $>50\%$ in MMLU, but usually it got at least a few right in each response cluster.
 
 Overall the distribution of correctness is bimodal across all datasets: most often the model LLM fails entirely, or is entirely correct in each response cloud.
 
@@ -235,9 +235,9 @@ spring-2026-llm_hallucinations-project/
 
 ### Spectral Graph Features (`08_geo_spectral_graph.ipynb`)
 
-An extended feature set built on the graph Laplacian **L = D − W**, where W is
-the N×N cosine similarity matrix (diagonal zeroed, negatives clipped).
-Eigendecomposition gives $0 = \lambda_{1} \leq \lambda_{2} \leq \lambda_{3} \leq \ldots \leq \lambda_{N}, and corresponding eigenvectors.
+An extended feature set built on the graph Laplacian **$L = D − W$**, where $W$ is
+the $N\times N$ cosine similarity matrix (diagonal zeroed, negatives clipped).
+Eigendecomposition gives $0 = \lambda_{1} \leq \lambda_{2} \leq \lambda_{3} \leq \ldots \leq \lambda_{N}$, and corresponding eigenvectors.
 
 ### Group A — Laplacian spectrum (6 features)
 
@@ -247,8 +247,8 @@ Eigendecomposition gives $0 = \lambda_{1} \leq \lambda_{2} \leq \lambda_{3} \leq
 | lam3 | Third eigenvalue $\lambda_{3}$ |
 | SGR | Spectral Gap Ratio $\frac{\lambda_{2}}{(\lambda_{3}+\epsilon)}$: clean bipartition signal |
 | spectral_entropy | Shannon entropy over normalised eigenvalue distribution |
-| ipr_fiedler | Inverse Participation Ratio of Fiedler vector v₂ |
-| HFER | $\lambda_{2}$ × Fiedler entropy — combines connectivity with partition geometry |
+| ipr_fiedler | Inverse Participation Ratio of Fiedler vector $v_2$ |
+| HFER | $\lambda_{2} \times$ Fiedler entropy — combines connectivity with partition geometry |
 
 ### Group B — Extended cluster structure (4 features)
 
