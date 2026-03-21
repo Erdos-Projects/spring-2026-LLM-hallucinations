@@ -9,7 +9,22 @@ import pandas as pd
 
 from spectral_detection.data.cleaning import LABEL_ORDER
 
+# Valid categories 
+VALID_DOMAINS = {
+    "STEM",
+    "Humanities",
+    "Social Sciences",
+    "Medicine & Health",
+    "Law, Business, and Miscellaneous"
+}
 
+def compute_majority_valid_domain(domain_series):
+    valid_subset = domain_series[domain_series.isin(VALID_DOMAINS)]
+    
+    if not valid_subset.empty:
+        return valid_subset.mode().iloc[0]
+    
+    
 def print_loading_summary(df, correctness_col="correctness"):
     """Print dataset shape, question count, correctness distribution, and domains."""
     name = df["dataset"].iloc[0] if "dataset" in df.columns else "unknown"
