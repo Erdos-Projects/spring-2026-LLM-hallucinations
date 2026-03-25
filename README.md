@@ -80,9 +80,13 @@ In Part I of our project we study whether **Laplacian eigenvalues of attention m
 
 For each layer $l$ and head $h$, the attention map $A^{(l,h)}$ is viewed as a directed graph, and its graph Laplacian is defined by
 $L^{(l,h)} = D^{(l,h)} - A^{(l,h)}$.
-Because the Laplacian is lower triangular given that we extract the Attentions at the decoder level, the eigenvalues lie on the diagonal and are bounded in $[-1,1]$. From each layer-head block, we retain the **top 10 eigenvalues**, producing a large raw feature vector per example. With $32$ layers and all heads included, this yields roughly **10,320 raw spectral features per question**!
+Because the Laplacian is lower triangular given that we extract the Attentions at the decoder level, the eigenvalues lie on the diagonal and are bounded in $[-1,1]$. From each layer-head block, we retain the **top 10 eigenvalues**, producing a large raw feature vector per example. With $32$ layers and all heads included, this yields roughly **6720 raw spectral features per question**!
 
 These raw features are high-dimensional and highly correlated, so we apply **Principal Component Analysis (PCA)** as the central feature-engineering step. PCA serves two purposes: it reduces dimensionality and it denoises the feature space by concentrating most of the useful variance into a smaller number of orthogonal components. In the main pipeline, the full spectral vector is reduced to **384 PCA dimensions**, while some visualization and layer-wise analyses use smaller PCA projections such as 64 dimensions. This makes downstream training faster and more stable without discarding the dominant structure in the eigenvalue features.
+
+<img src="/images/scree_plot.png" alt="Description" width="800" />
+
+As seen in the Scree plot, *most of the variance is retained by the first few principal components*.
 
 ### Training Pipeline
 
@@ -94,7 +98,15 @@ The primary supervised pipeline is:
 
 The baseline probe in the project document is **logistic regression on PCA-projected eigenvalue features**, which serves as a strong and interpretable reference model. In later experiments on the combined **TriviaQA + MMLU** dataset, we also compare several alternative classifiers, including **Linear SVM + calibration**, **Random Forest**, **AdaBoost**, and **SGDClassifier**. This lets us test whether the signal is primarily linear or whether it benefits from more complex nonlinear decision boundaries.
 
-Empirically, the best-performing models on the combined dataset are the **linear methods**, with logistic regression achieving the strongest AUROC and linear SVM performing very similarly. This suggests that PCA is not just a compression step: it also helps organize the spectral features into a representation where a relatively simple linear boundary already captures most of the useful label signal.
+The test AUROC score are as follows.
+
+<p float="left">
+  <img src="/images/auroc_log_reg.png" alt="Description 1" width="600" />
+  <img src="/images/auroc_dataset.png" alt="Description 2" width="600" />
+</p>
+
+The combined *TriviaQA* and *MMLU* dataset yields the strongest overall performance. Empirically, the best results are achieved by **linear models**, with **Logistic Regression** attaining the highest AUROC and **Linear SVM** performing nearly as well. This indicates that PCA is doing more than simple dimensionality reduction—it is organizing the spectral features into a space where the label signal is largely captured by a linear decision boundary. The comparatively weaker performance of tree-based ensemble methods further supports this, suggesting that after PCA, the data becomes largely linearly separable and does not require more complex nonlinear modeling.
+
 
 ### Visualizations
 
@@ -103,11 +115,23 @@ The project uses five main visualizations plus a bootstrap test:
 - **V1: Eigenvalue KDE by rank.**  
   Compares the distribution of each eigenvalue rank for correct versus hallucinated examples. This checks whether the raw signal is already visible before any classifier is trained. Cohen’s $d$ is used as a simple effect-size summary.
 
-- **V2: Layer × head p-value heatmap.**  
-  For each layer-head block, a two-sided Mann–Whitney test compares the mean top-10 eigenvalue between the two labels. The percentage of heads with $p<0.05$ acts as a localization metric for where the signal is strongest in the network.
+  <img src="/images/eig_dist.png" alt="Description" width="800" />
 
+  The strongest separation appears at low ranks, showing that leading eigenvalues already carry label signal. Hallucinated samples show broader and heavier-tailed distributions, consistent with more diffuse attention flow.
+
+- **V2: Layer × head p-value heatmap.**  
+  For each layer-head block, a two-sided Mann–Whitney test compares the mean top-10 eigenvalue between the two labels. The percentage of heads with $p<0.05$ acts as a localization metric for where the signal is strongest in the network. Hallucinated samples show broader and heavier-tailed distributions, consistent with more diffuse attention flow.
+
+  <img src="/images/pvalue_heatmap.png" alt="Description" width="1000" />
+
+  The pooled dataset has the highest share of heads with $p<0.05$. This means spectral differences between correct and hallucinated responses are most consistently detectable when datasets are combined.
+  
 - **V3: Layer-wise AUROC profile.**  
   Trains a separate probe on each individual layer and compares it with the all-layer model. This reveals whether the signal is concentrated in a few layers or distributed across the network. The expected pattern is that deeper layers perform better, but the all-layer model still wins overall.
+
+  <img src="/images/layerwise_auroc.png" alt="Description" width="1000" />
+
+  This plot answers two questions. First, it shows whether some layers are more informative than others. Second, by comparing the per-layer curve with the all-layer dashed line, it tests whether hallucination signal is localized to a single layer or distributed across many layers. If the dashed all-layer line remains above every individual layer peak, that supports the idea that the model benefits from combining information across the whole network.
 
 - **V4: ROC comparison across datasets.**  
   Compares the Laplacian-eigenvalue pipeline against baselines and ablations across datasets. This is the main diagnostic for predictive performance and robustness of the feature set.
@@ -119,6 +143,8 @@ The project uses five main visualizations plus a bootstrap test:
   Independently of the classifier, the project tests whether hallucinated samples have a higher mean leading Laplacian eigenvalue $\lambda_{1}$. The bootstrap computes the observed difference
   $\delta_{\mathrm{obs}}=\overline{\lambda_{1}}(y=1)-\overline{\lambda_{1}}(y=0)$,
   and estimates a one-sided $p$-value and 95% confidence interval by resampling with replacement. This provides formal inferential support for the raw spectral hypothesis without assuming Gaussianity.
+
+  <img src="/images/bootstrap_halueval_hist.png" alt="Description" width="1000" />
 
 ### Final Results and Main Takeaways
 
