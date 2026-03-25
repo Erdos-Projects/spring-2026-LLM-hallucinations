@@ -1,6 +1,9 @@
-# spring-2026-LLM-hallucinations
+## Spring-2026-LLM-hallucinations
+
 
 # LLM Hallucination Detector
+
+<img src="/images/robot_detect.png" alt="Description" style="display: block; margin: 0 auto;"/>
 
 ### LLM Hallucination via Attention Heads Spectrum, Semantic Entropy, and Embedding Geometry
 
@@ -14,20 +17,21 @@
 
 ## Mini-Abstract
 
-Hallucinations commonly occur when a Large Language Model (LLM) faces unexpected or rare prompts. While rapid advances in LLMs followed the introduction of the attention mechanism (in the seminal paper “Attention Is All You Need”), the underlying mechanics of neural network inference remain opaque. Because these models often operate as a “black box,” active research is dedicated to shedding light on exactly how an LLM processes information. This leads to our first question:
+Hallucinations commonly occur when a Large Language Model (LLM) faces unexpected or rare prompts. While rapid advances in LLMs followed the introduction of the self-attention mechanism (in the seminal paper “Attention Is All You Need”), the underlying mechanics of neural network inference remain opaque. Because these models often operate as a “black box”, active research is dedicated to shedding light on exactly how an LLM processes information. 
+
+*This leads to our first question:*
 
 `Question 1:`  Can we observe some natural correlation between hallucinations produced by an LLM and the numerical data that propagates through it? 
 
-For answering it our project runs a **Data Science Neurosurgery on the Transformer’s Attention heads**, and trains the top-k eigenvalues of Attention against the label “hallucination or not”.
-AI creativity and power comes from random draws.  LLMs prcess the information by inferring the next “token” of a response through probability sampling, at a certain “temperature” $T$.  Low temp $T\sim 0$ $\rightarrow$ always pick token with highest probability, making the pick “deterministic.  High temp implies a more “generative” and “creative” process. 
+For answering it, our project runs a **Data Science Neurosurgery on the Transformer’s Attention heads**, and trains the top-k eigenvalues of the Attention-Map Laplacian against the label “hallucination or not”.  AI creativity and power comes from random draws.  LLMs process the information by inferring the next “token” of a response through probability sampling, at a certain “temperature” $T$.  Low temp $T\sim 0$ $\rightarrow$ always picks tokens with highest probability, making the choice “deterministic.  High temp implies a more “generative” and “creative” process.
 
 *As a consequence we make the next question:*
 
-`Question 2:`  Can we predict hallucinations by only analyzing the geometric and spectral properties of probability distributions built during the Generative process of an LLM? 
+`Question 2:`  Can we predict hallucinations by analyzing exclusively the geometric and spectral properties of probability distributions built during the Generative process of an LLM? 
 
 Indeed, to answer this we note that there exists a natural mapping between prompts and the space of distribution of responses.  In the second part of our project we convert a variable-length set of text responses into a fixed-size **numeric feature vector** that captures whether the model is hallucinating.  For each question $q_{i}$ in our dataset, we sample $N = 20$ responses. Each response is a string of text. We embed each response into a vector $e_{ij} \in \mathbb{R}^{384}$ (using a sentence transformer). At this point, we have $N=20$ vectors per question, but we do not use these 20 vectors as 20 separate rows in our dataset. Instead, we aggregate them into a single feature vector that summarises the distribution of responses for that question.  
 
-Our work introduces a feature vector that summarizes the distribution of responses, and is composed of `semantic and geometric` metrics as those introduced by Farquhar et. al. 2024, Ricco et al., 2025, Zhao et al., 2025, Lee et al., 2018, such as the following:
+Our work introduces a feature vector that summarizes the distribution of responses, and is composed of `semantic` and `geometric` metrics as those introduced by Farquhar et. al. 2024, Ricco et al., 2025, Zhao et al., 2025, Lee et al., 2018, such as the following:
 
 1. Semantic entropy $H_{sem}$: How many distinct meanings appear in the 20 responses? 
 
@@ -37,9 +41,21 @@ Our work introduces a feature vector that summarizes the distribution of respons
 
 4. Similarity variance $\sigma^{2}_{S}$: How uneven is the agreement between response pairs?
 
-We go a step further and introduce additional features corresponding to the `graph connectivity` of the distribution of responses, indicating degree of connectivity of the distribution of responses.  
+We go a step further and introduce additional features corresponding to the `graph connectivity` of the distribution of responses, indicating the degree of connectivity of the distribution of responses.  See also `09_geo_spectral_graph.ipynb`
 
-### Data Collection Pipeline: 
+### Embeddings and t-SNE
+
+Semantic meaning captures the contextual intent of language independent of its literal syntax. Text embeddings quantify this meaning by mapping natural language into continuous, high-dimensional vector spaces.  In our work, we use `all-MiniLM-L6-v2`, an optimized Sentence Transformer available in Huggingface, that maps the questions to the space $\mathbb{R}^{384}$.  The relationships between phrases is measured by the cosine similarity ($\frac{s_1 \cdot s_2} {| s_1 | | s_2 |} $), which is also one of the basic constituent of our geometric training features.  
+
+Hallucinations clusters unevenly spread meanings in $\mathbb{R}^{384}$ and therefore have elongated Convex Hulls!   We train a t-SNE, which acts through the minimization of the KL divergence "replicating" high-dimensional neighborhoods into lower dimensional spaces, as seen below.  
+
+<figure>
+<img src="/images/tSNEprojection.png" alt="Description" style="display: block; margin: 0 auto;">
+</figure>
+
+*In the figure, we map the 10,000 responses of the MMLU benchmark (20 responses for all 500 chosen questions) and highlight 3 response clouds graded by different response "certainty".  Observe the dramatic Convex Hull for a Hallucination!*
+
+### Data Collection Pipeline:
 
 Generative training data was collected and computed using diverse benchmarks (shown in the table below).  Each question was reformatted to fit a Python dictionary of the form:  
 
@@ -47,13 +63,13 @@ Generative training data was collected and computed using diverse benchmarks (sh
 [“question”, “reference_answer”, “choices”], 
 ```
 
-and passed to our LLM of choice, Llama-3.2-3B (quantized to 4bits).  Llama is forced to answer at a temperature of 1.0 (“to be more creative”).  The LLM’s response is collected in a standardized dataframe.  For answering `Question 1`, we simultaneously extract the Attention Heads matrices (stored temporarily in RAM) to calculate the top-k eigenvalues which we encode in binary files.  For `Question 2` we generate $N=20$ responses for each prompt.  The responses are evaluated by a “more powerful” LLM-Judge.  Our judge is a “lightweight” LLM, such as GPT-Mini or GPT-4.1-nano;  we use standardized prompting (please refer to `config.py`) in order to “instruct” the judge to also answer under pre-defined format.  Multi-sampled responses are cleaned and filtered, and embedded into a the high dimensional space $\mathbb{R}^{384}$ using pre-trained Sentence Transfomers, and aggregated as features as described in `notebooks/06_geo_feature.ipynb`.  The data collection workflow is shown below:
+and passed to our LLM of choice, Llama-3.2-3B (quantized to 4bits).  Llama is forced to answer at a temperature of 1.0 (“to be more creative”).  The LLM’s response is collected in a standardized `JSON` file.  For answering `Question 1`, we simultaneously extract the Attention Heads matrices (stored temporarily in VRAM while running in Colab on a A100 GPU) to calculate the top-k eigenvalues which we encode in binary files.  For `Question 2` we generate $N=20$ responses for each prompt.  The responses are evaluated by a “more powerful” LLM-Judge.  Our judge is a “lightweight” but strong LLM, such as GPT-Mini-4o or GPT-4.1-nano;  we use standardized prompting (please refer to `config.py`) in order to “instruct” the judge to also answer under pre-defined formats.  Multi-sampled responses are cleaned and filtered, and embedded into a the high dimensional space $\mathbb{R}^{384}$ using pre-trained Sentence Transfomers, and aggregated as features as described in `notebooks/06_geo_feature.ipynb`.  The data collection workflow is shown below:
 
 <img src="/images/data_collection.png" alt="Description" width="1000" />
 
 ## Data Computing:
 
-For eigenvalue extraction, responses were generated with **Llama-3.2-3B**, running in Colab in a GPU H100, and labelled by **GPT-4.1-nano**, using nuclear sampling.  Llama allows extraction of the attention heads for the last token of the decoder's step.
+For eigenvalue extraction, responses were generated with **Llama-3.2-3B**, running in Colab in a GPU A100, and labelled by **GPT-4.1-nano**, using nuclear sampling at $\tau=0.85$.  Llama allows extraction of the attention head maps during the last token's decoding.
 
 ---
 ## `Part I: Hallucination Detection via Spectral Features of Attention Maps`
@@ -128,7 +144,32 @@ For threshold correctness ($y$), MMLU was the most difficult: hardest for the LL
 
 Overall the distribution of correctness is bimodal across all datasets: most often the model LLM fails entirely, or is entirely correct in each response cloud.
 
-<img src="/images/boxplot.png" alt="Description" width="500" />
+<p align="center">
+<img src="/images/boxplot.png" alt="Description" width="500" style="display: block; margin: 0 auto;"/>
+</p>  
+
+*Box plot graph of p_hat, the estimated probability of a hallucination, calculated from N=20 responses.*
+
+<figure>
+<img src="/images/kde_all.png" alt="Description" style="display: block; margin: 0 auto;"/>
+</figure>
+
+*KDE plots fitting distributions of Semantic and Geometric Features.  Many features display bi-modal behaviour, implying good separation between classes.*
+
+We also evaluated the distribution of domains across the different datasets, but domain-information has been chosen as exclusively exploratory, given that such category shows spurious results when retrieved via judge-LLM responses.
+
+<figure>
+<img src="/images/triviarate.png" alt="Description" style="display: block; margin: 0 auto;"/>
+</figure> 
+
+*Distribution of domains vs hallucinations.  EDA only.*
+
+
+<figure>
+<img src="/images/tSNEmulti.png" alt="Description" style="display: block; margin: 0 auto;"/>
+</figure> 
+
+*Experiment running high-temp Llama-3.2-3B for 100-samples, upper row t-SNE 2D map showing that hallucinations agglomerative clustering number is evidently larger (right hand side), resulting in more clusters with less components.  The KDE density corroborates this (second row).  In the third row we can observe how the D_cos displays a clear fat tail, i.e. a clear higher frequency of weak links between responses.*
 
 
 ### Baseline training story and results
@@ -143,6 +184,19 @@ In the end we found that the **ElasticNet Logit trained on all 6 features** gave
 
 We also tested feature importance and found the majority of hallucination detection signal was carried by the features $D_{cos}$ (semantic spread) and $H_{sem}$ (fragmentation measure), with $\sigma^{2}_{S}$ (instability measure) carrying relatively smaller but complementary signal.
 
+<figure>
+<img src="/images/combined_ablation.png" alt="Description" style="display: block; margin: 0 auto;"/>
+</figure>
+
+*Combined ablation results across 6 different models.*
+
+<figure>
+<img src="/images/combined_beeswarm.png" alt="Description" style="display: block; margin: 0 auto;"/>
+</figure>
+
+*Feature importance winners: H_sem (semantic entropy) and D_cos (cosine dispersion).  D_pair, (pairwise interaction) is highly correlated to the cosine dispersion and can be dropped having only a small performance drop.*
+
+
 ### Secondary feature set examination
 
 In addition to our main 6-feature baseline discussed above, we wondered whether in place of dispersion and entropy we could find a different set of features that carried a similar predictive power. For this we looked to **response-graph spectral features** (see Group A below) and **extended cluster structure features** (Group B). We tested these alternate features (`08_geo_spectral_graph.ipynb`) and found that taken together, Group A + Group B features would indeed carry comparable predictive power, however when taken together with the baseline features, they did not contribute meaningful additional signal.
@@ -151,8 +205,18 @@ Being able to work with this secondary feature set may potentially be helpful in
 
 ### Statistical tests and EDA findings
 
-We also performed statistical tests such as `KS Test`, to validate that distributions were distinct enough, `Permutation Test`  to determine whether the model has learned a genuine dependency between the features and the target labels, and `Bootstrap` to prove that the classifiers used for train our model reliably outperform chance.  See 
-`07_geo_statistics.ipynb`.
+We also performed statistical tests such as `KS Test`, to validate that distributions were distinct enough, `Permutation Test`  to determine whether the model has learned a genuine dependency between the features and the target labels (null hypothesis $H_{0}$: mean entropy is the same for hallucinated and correct questions), and `Bootstrap` to prove that the classifiers used for training our model reliably outperform chance.  See also `07_geo_statistics.ipynb` and figures below.
+
+<div style="display: flex; justify-content: space-between;">
+  <figure style="width: 50%;">
+    <img src="/images/combined_permutation.png" alt="Alt text 1" style="width: 100%;">
+  </figure>
+  <figure style="width: 50%;">
+    <img src="/images/combined_bootstrap.png" alt="Alt text 2" style="width: 100%;">
+  </figure>
+</div>
+
+*(left) Permutation test: Hallucinated questions have nearly 2 bits higher entropy. No permutation out of 10,000 matched this gap.  (right) Bootstrap: the classifier reliably outperforms chance.*
 
 ### Impact on Large Scale AI Deployment
 
@@ -192,17 +256,20 @@ spring-2026-llm_hallucinations-project/
 │   └── training.py              # ML training routines, ablation
 │
 ├── notebooks/ 
-│   ├── 01_data_generation.ipynb 
+│   ├── 01_data_generation.ipynb                    # Data Computing
 │   ├── 02_attention_datagen.ipynb
-│   ├── 03_attention_feature_training.ipynb
-│   ├── 04_attention_visualization.ipynb
-│   ├── 05_geo_eda.ipynb
+│   ├── 03_attention_feature_training.ipynb         # Part I
+│   ├── 04_attention_visualization.ipynb        
+│   ├── 05_geo_eda.ipynb                            # Part II
 │   ├── 06_geo_feature_extraction.ipynb
 │   ├── 07_geo_statistics.ipynb
 │   ├── 08_geo_training.ipynb
 │   ├── 09_geo_spectral_graph.ipynb
 │   ├── 10_geo_visualization.ipynb
-│   └── 11_geo_visualization_partII.ipynb
+│   ├── 11_geo_visualization_partII.ipynb
+│   ├── 12_geo_cluster_level_data_generation.ipynb  # Paraphrasing research
+│   ├── 13_geo_cluster_judge.ipynb
+│   └── 14_geo_cluster_vs_sample_analysis.ipynb
 │
 ├── requirements.txt
 └── README.md
@@ -288,6 +355,9 @@ Eigendecomposition gives $0 = \lambda_{1} \leq \lambda_{2} \leq \lambda_{3} \leq
 # Training geometric                    08_geo_training.ipynb
 # Spectral                              09_geo_spectral_graph.ipynb
 # t-SNE visualizations                  10_geo_visualization.ipynb
-# Advanced visualizations                11_geo_visualization_partII.ipynb
+# Advanced visualizations               11_geo_visualization_partII.ipynb
 
+# Research on DeFan paraphrasing        12_geo_cluster_level_data_generation.ipynb  # Paraphrasing research
+#                                       13_geo_cluster_judge.ipynb
+#                                       14_geo_cluster_vs_sample_analysis.ipynb
 ```
