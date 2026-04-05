@@ -242,7 +242,7 @@ We also performed statistical tests such as `KS Test`, to validate that distribu
   </figure>
 </div>
 
-*(left) Permutation test: Hallucinated questions have nearly 2 bits higher entropy. No permutation out of 10,000 matched this gap.  (right) Bootstrap: the classifier reliably outperforms chance.*
+*(upper) Permutation test: Hallucinated questions have nearly 2 bits higher entropy. No permutation out of 10,000 matched this gap.  (lower) Bootstrap: the classifier reliably outperforms chance.*
 
 ### Impact on Large Scale AI Deployment
 
